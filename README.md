@@ -220,4 +220,3 @@ tests/                        # Unit and integration tests
 - **LLM variability:** Results are non-deterministic across runs due to LLM output variance. The self-refinement loop mitigates syntax errors but not semantic mismodeling.
 - **Single-file scope:** Only verifies functions within one file. External imports and standard library calls are not modeled.
 
-.
