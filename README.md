@@ -219,3 +219,5 @@ tests/                        # Unit and integration tests
 - **Data structures:** Lists, dictionaries, and strings are abstracted into simpler Z3-compatible representations (e.g., length as `Int`), so some data-structure bugs may be missed.
 - **LLM variability:** Results are non-deterministic across runs due to LLM output variance. The self-refinement loop mitigates syntax errors but not semantic mismodeling.
 - **Single-file scope:** Only verifies functions within one file. External imports and standard library calls are not modeled.
+
+.
