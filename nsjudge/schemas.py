@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class FunctionInfo(BaseModel):
@@ -60,6 +60,21 @@ class VerifiedContract(BaseModel):
     z3_result: Z3Result
 
 
+class TokenUsage(BaseModel):
+    """Accumulated LLM token usage across all API calls."""
+
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+
+    def __add__(self, other: "TokenUsage") -> "TokenUsage":
+        return TokenUsage(
+            prompt_tokens=self.prompt_tokens + other.prompt_tokens,
+            completion_tokens=self.completion_tokens + other.completion_tokens,
+            total_tokens=self.total_tokens + other.total_tokens,
+        )
+
+
 class VerificationReport(BaseModel):
     """Complete verification output for an entire file."""
 
@@ -69,3 +84,4 @@ class VerificationReport(BaseModel):
     counterexamples: list[Z3Result]
     errors: list[Z3Result]
     summary: str
+    token_usage: TokenUsage = Field(default_factory=TokenUsage)

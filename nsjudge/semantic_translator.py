@@ -18,6 +18,7 @@ from nsjudge.schemas import (
     FunctionContract,
     FunctionInfo,
     RefinementRequest,
+    TokenUsage,
     VerifiedContract,
 )
 
@@ -38,7 +39,7 @@ class SemanticTranslator:
         self,
         func_info: FunctionInfo,
         verified_deps: dict[str, VerifiedContract] | None = None,
-    ) -> FunctionContract:
+    ) -> tuple[FunctionContract, TokenUsage]:
         """Generate a formal contract and Z3 script for a function."""
         dependency_context = self._build_dependency_context(verified_deps or {})
 
@@ -54,9 +55,15 @@ class SemanticTranslator:
             contents=prompt,
             config=self._config,
         )
-        return self._parse_response(response.text)
+        u = response.usage_metadata
+        usage = TokenUsage(
+            prompt_tokens=u.prompt_token_count or 0,
+            completion_tokens=u.candidates_token_count or 0,
+            total_tokens=u.total_token_count or 0,
+        )
+        return self._parse_response(response.text), usage
 
-    def refine_contract(self, request: RefinementRequest) -> FunctionContract:
+    def refine_contract(self, request: RefinementRequest) -> tuple[FunctionContract, TokenUsage]:
         """Ask the LLM to fix a broken Z3 script."""
         prompt = REFINEMENT_PROMPT.format(
             function_name=request.original_contract.function_name,
@@ -69,7 +76,13 @@ class SemanticTranslator:
             contents=prompt,
             config=self._config,
         )
-        return self._parse_response(response.text)
+        u = response.usage_metadata
+        usage = TokenUsage(
+            prompt_tokens=u.prompt_token_count or 0,
+            completion_tokens=u.candidates_token_count or 0,
+            total_tokens=u.total_token_count or 0,
+        )
+        return self._parse_response(response.text), usage
 
     def _build_dependency_context(
         self, verified_deps: dict[str, VerifiedContract]

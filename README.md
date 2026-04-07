@@ -56,7 +56,7 @@ The system takes a single-file Python program with a `main()` entry point and ma
 │   │  2b. CONSTRAINT EXECUTION SANDBOX (constraint_sandbox.py)  │   │
 │   │                                                            │   │
 │   │  • Writes Z3 script to temp file                           │   │
-│   │  • Executes in isolated subprocess (30s timeout)           │   │
+│   │  • Executes in isolated subprocess (60s timeout)           │   │
 │   │  • Parses stdout for VERIFIED or COUNTEREXAMPLE            │   │
 │   └────────────────────────┬───────────────────────────────────┘   │
 │                            │                                        │

@@ -5,6 +5,7 @@ from nsjudge.constraint_sandbox import ConstraintSandbox
 from nsjudge.schemas import (
     FunctionInfo,
     RefinementRequest,
+    TokenUsage,
     VerifiedContract,
     Z3Result,
 )
@@ -28,19 +29,23 @@ class CompositionalVerifier:
         self,
         func_info: FunctionInfo,
         verified_deps: dict[str, VerifiedContract],
-    ) -> tuple[Z3Result, VerifiedContract | None]:
+    ) -> tuple[Z3Result, VerifiedContract | None, TokenUsage]:
         """Verify a single function, using refinement if Z3 script errors.
 
-        Returns the Z3Result and, if verified, a VerifiedContract for roll-up.
+        Returns the Z3Result, an optional VerifiedContract for roll-up, and
+        the accumulated TokenUsage across all LLM calls for this function.
         """
+        token_usage = TokenUsage()
+
         try:
-            contract = self._translator.generate_contract(func_info, verified_deps)
+            contract, usage = self._translator.generate_contract(func_info, verified_deps)
+            token_usage = token_usage + usage
         except Exception as e:
             return Z3Result(
                 function_name=func_info.name,
                 status="error",
                 error_message=f"LLM contract generation failed: {e}",
-            ), None
+            ), None, token_usage
 
         result = self._sandbox.execute(func_info.name, contract.z3_script)
 
@@ -53,7 +58,8 @@ class CompositionalVerifier:
                     error_traceback=result.error_message or result.raw_output,
                     attempt_number=attempt,
                 )
-                contract = self._translator.refine_contract(refinement)
+                contract, usage = self._translator.refine_contract(refinement)
+                token_usage = token_usage + usage
                 result = self._sandbox.execute(func_info.name, contract.z3_script)
             except Exception as e:
                 result = Z3Result(
@@ -68,6 +74,6 @@ class CompositionalVerifier:
                 contract=contract,
                 z3_result=result,
             )
-            return result, verified
+            return result, verified, token_usage
 
-        return result, None
+        return result, None, token_usage

@@ -6,7 +6,7 @@ from nsjudge.ast_ingestion import parse_file
 from nsjudge.compositional import CompositionalVerifier
 from nsjudge.config import Settings
 from nsjudge.constraint_sandbox import ConstraintSandbox
-from nsjudge.schemas import VerificationReport, VerifiedContract, Z3Result
+from nsjudge.schemas import TokenUsage, VerificationReport, VerifiedContract, Z3Result
 from nsjudge.semantic_translator import SemanticTranslator
 
 
@@ -38,6 +38,7 @@ class Orchestrator:
         verified_list: list[VerifiedContract] = []
         counterexamples: list[Z3Result] = []
         errors: list[Z3Result] = []
+        total_token_usage = TokenUsage()
 
         total = len(graph.verification_order)
 
@@ -51,9 +52,10 @@ class Orchestrator:
                 if name in verified_deps
             }
 
-            result, verified_contract = self._verifier.verify_function(
+            result, verified_contract, token_usage = self._verifier.verify_function(
                 func_info, relevant_deps
             )
+            total_token_usage = total_token_usage + token_usage
 
             if verified_contract is not None:
                 verified_deps[func_name] = verified_contract
@@ -82,4 +84,5 @@ class Orchestrator:
             counterexamples=counterexamples,
             errors=errors,
             summary=summary,
+            token_usage=total_token_usage,
         )
