@@ -32,6 +32,7 @@ class SemanticTranslator:
         self._config = types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
             response_mime_type="application/json",
+            response_schema=FunctionContract,
             temperature=0.2,
         )
 
