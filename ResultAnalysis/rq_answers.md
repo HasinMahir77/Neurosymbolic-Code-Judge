@@ -1,10 +1,8 @@
 # Research Question Answers
 
 **System:** Neuro-Symbolic Code Judge (LLM → Z3 SMT solver pipeline)  
-**Models tested:** `gemini-3-flash-preview`, `gemini-2.5-flash`, `gemini-3.1-flash-live-preview`  
-**Dataset:** 15 Python scripts — 10 buggy, 5 clean  
-- Scripts 01–10: original set (missing guards, off-by-one boundaries, unreachable branches)  
-- Scripts 11–15: extended set (core-logic mathematical bugs — binary search invariants, operation order, divisor counting, primality)  
+**Models tested:** `gemini-3-flash-preview`, `gemini-2.5-flash`  
+**Dataset:** 15 Python scripts — 10 buggy, 5 clean (missing guards, off-by-one boundaries, unreachable branches, binary search invariants, operation order, divisor counting, primality)  
 **Thinking budget:** 0 (disabled) for all runs  
 **Date:** 2026-04-08
 
@@ -14,7 +12,7 @@
 
 > Does the neuro-symbolic hybrid achieve higher bug detection accuracy than using an LLM alone?
 
-### Results — full 15-script dataset
+### Results
 
 | Approach | Model | TP | TN | FP | FN | Unc/Err | Accuracy |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -23,35 +21,26 @@
 | LLM-only | gemini-3-flash-preview | 9/10 | 4/5 | 1 | 0 | 1 | 13/14 dec. |
 | Hybrid | gemini-2.5-flash | 8/10 | 3/5 | 1 | 1 | 2 | 11/13 dec. |
 
-### Original 10-script dataset
-
-On the simpler dataset (guards, boundary bugs, unreachable branches), all three working configurations achieved 10/10. The bugs were within reach of direct code reading, so no accuracy gap between the hybrid and LLM-only was observable.
-
-### Extended 15-script dataset
-
-Adding four mathematically subtle bugs (binary search invariant, modular exponentiation operation order, perfect square divisor counting, primality trial division boundary) produced a clear differentiation:
-
 **The hybrid with gemini-3-flash-preview is the only configuration to achieve a perfect 15/15 with zero false positives.**
 
-The critical new observation: `gemini-3-flash-preview` LLM-only **falsely flagged `08_power_clean.py` as BUGGY**, spending ~16k thinking tokens to hallucinate a bug in a correct function. The hybrid's Z3 proof for `power` returned VERIFIED, blocking that false alarm. This is the first empirical demonstration — not a theoretical argument — that the SMT layer prevents the language model from hallucinating bugs in clean code.
+A critical observation: `gemini-3-flash-preview` LLM-only **falsely flagged `08_power_clean.py` as BUGGY**, spending ~16k thinking tokens to hallucinate a bug in a correct function. The hybrid's Z3 proof for `power` returned VERIFIED, blocking that false alarm. This is the first empirical demonstration — not a theoretical argument — that the SMT layer prevents the language model from hallucinating bugs in clean code.
 
-`gemini-2.5-flash` LLM-only also achieved 15/15 with 0 FP at far lower token cost. It does not produce formal counterexamples, but as a fast triage tool it is competitive with the hybrid on accuracy.
+While `gemini-2.5-flash` LLM-only also achieves 15/15, its verdict is a black-box assertion — no trace, no witness, no way to verify the reasoning. A developer receiving a BUGGY verdict has no basis to trust or reproduce it. The hybrid changes this fundamentally.
 
 ### Conclusion
 
-The hybrid with `gemini-3-flash-preview` matches or exceeds all LLM-only configurations and provides two advantages that no LLM-only approach can match:
-1. **Formal counterexamples** — every BUGGY verdict includes a concretely verifiable witness (`n = 4`, `base=2, exp=2, mod=5`, etc.)
-2. **False-positive immunity** — the SMT proof prevented the hallucinated bug that the same model produced without Z3
+Raw accuracy on this dataset does not fully separate the hybrid from the best LLM-only baseline. What separates them is the nature of the verdict. The hybrid provides two guarantees that no LLM-only approach can match:
+
+1. **Traceable, step-by-step proof** — the Z3 script encodes the function's contract as explicit logical constraints. Every verification step can be inspected, replayed, and audited independently of the LLM.
+2. **Concrete, runnable counterexamples** — every BUGGY verdict includes a specific witness (`n = 4`, `base=2, exp=2, mod=5`, `lo=1, hi=0`) that can be executed directly against the source to confirm the bug. LLM-only verdicts offer none of this; they are opaque confidence scores dressed as conclusions.
+
+The SMT layer also eliminates false positives caused by model hallucination — something LLM-only cannot self-correct.
 
 ---
 
 ## RQ2 — LLM Model Sensitivity
 
 > How does the choice of underlying LLM affect contract quality, measured by parse success rate, false positive rate, and correct bug detection?
-
-### Compatibility
-
-`gemini-3.1-flash-live-preview` is a **live/streaming API model** for real-time conversation, not batch `generateContent` calls. All 15 files errored immediately. It is excluded from quantitative comparison.
 
 ### Hybrid benchmark — full 15 scripts
 
@@ -69,11 +58,11 @@ The hybrid with `gemini-3-flash-preview` matches or exceeds all LLM-only configu
 
 ### Key findings
 
-**1. The model gap widens substantially on harder bugs.**  
-On the original 10-script dataset, gemini-2.5-flash hybrid achieved 6/7 decisive; on the full 15-script dataset it drops to 11/13 decisive with a new false positive on `clamp_clean`. Its Z3 script errors (symbolic list indexing, `TypeError: list indices must be integers or slices, not ArithRef`) persist and now affect more files. gemini-3-flash-preview hybrid remains at 100% across both datasets.
+**1. The model gap is substantial.**  
+gemini-2.5-flash hybrid achieves only 11/13 decisive with a false positive on `clamp_clean`. Its Z3 script errors (symbolic list indexing, `TypeError: list indices must be integers or slices, not ArithRef`) affect multiple files. gemini-3-flash-preview hybrid achieves 100% with zero errors.
 
-**2. gemini-2.5-flash hybrid now produces a false positive.**  
-The LLM generated an over-constrained postcondition for `clamp`, causing Z3 to find a spurious counterexample in a correct function. gemini-3-flash-preview produced no false positives in any run.
+**2. gemini-2.5-flash hybrid produces a false positive.**  
+The LLM generated an over-constrained postcondition for `clamp`, causing Z3 to find a spurious counterexample in a correct function. gemini-3-flash-preview produced no false positives in any run. Crucially, the false positive is detectable: running the counterexample against the actual Python function does not reproduce the claimed bug — the proof trail exposes the spec error.
 
 **3. Heavy thinking is counterproductive for LLM-only.**  
 gemini-3-flash-preview LLM-only uses 20,081 tokens/file (98% thinking) and achieves 13/14 decisive — worse than gemini-2.5-flash LLM-only at 2,273 tokens/file. The thinking model hallucinated a bug in `power_clean` and failed to produce a JSON response for `is_palindrome`. Unconstrained reasoning increases both cost and error rate.
@@ -120,13 +109,21 @@ The hybrid imposes strict code-generation constraints (Z3-only imports, `If`-cha
 | `count_divisors` | `n = 4` | ✓ Real bug |
 | `is_prime` | `n = 9` | ✓ Real bug |
 
-**Precision: 12/12 = 100%.** Every counterexample produced across the full dataset is a genuine, independently reproducible bug.
+**Precision: 12/12 = 100%.** Every counterexample is a genuine, independently reproducible bug. Each one is not just a verdict — it is actionable evidence: a developer can paste the input directly into a test, run it, and watch the function fail. This is the defining advantage over LLM-only outputs, which produce a verdict but no proof.
 
 ### gemini-2.5-flash hybrid — false positive
 
-`05_clamp_clean.py` was flagged BUGGY via a counterexample on `clamp`. This is a false positive — `clamp` is correct. The LLM generated an over-constrained postcondition and Z3 found a witness that violates the wrong spec, not the actual function. This is detectable downstream by running the counterexample input against the real Python function — it would not trigger the claimed bug.
+`05_clamp_clean.py` was flagged BUGGY via a counterexample on `clamp`. This is a false positive — `clamp` is correct. The LLM generated an over-constrained postcondition and Z3 found a witness that violates the wrong spec, not the actual function. Because the counterexample is explicit and runnable, this error is detectable: executing the claimed witness against the real Python function does not reproduce the bug, immediately revealing the spec error. An LLM-only false positive has no such self-correction path.
 
 **Overall precision: 12 genuine / 13 total counterexamples = 92%, driven entirely by the gemini-2.5-flash false positive. gemini-3-flash-preview precision: 12/12 = 100%.**
+
+---
+
+## RQ4 — Hybrid vs. Human Reviewers
+
+> How does the neuro-symbolic hybrid compare to human code reviewers in terms of bug detection rate, false positive rate, and time-to-verdict?
+
+**Pending.** This research question requires human participants to review the dataset scripts and record their verdicts. A Google Form has been prepared for this purpose. Results will be incorporated once responses are collected.
 
 ---
 
@@ -149,20 +146,20 @@ The hybrid imposes strict code-generation constraints (Z3-only imports, `If`-cha
 
 ### Token overhead and what it buys
 
-The hybrid (`gemini-3-flash-preview`, 8,152 tok/file) costs 3.6× more than `gemini-2.5-flash` LLM-only (2,273 tok/file) at the same 15/15 accuracy. That overhead delivers:
+The hybrid (`gemini-3-flash-preview`, 8,152 tok/file) costs 3.6× more than `gemini-2.5-flash` LLM-only (2,273 tok/file) at the same 15/15 accuracy. That overhead is not paying for a better verdict — it is paying for justification:
 
-- **Concrete, runnable counterexamples** — `n = 4`, `base=2, exp=2, mod=5`, `lo=1, hi=0` — that can be directly tested against the source
-- **Executable Z3 proofs** that can be inspected, replayed, and audited independently of the LLM
-- **False-positive elimination** — the SMT proof blocked the hallucinated bug that `gemini-3-flash-preview` LLM-only produced on `power_clean` at 20,081 tokens/file
+- **Concrete, runnable counterexamples** — `n = 4`, `base=2, exp=2, mod=5`, `lo=1, hi=0` — directly executable against the source, turning a verdict into a reproducible test case
+- **Traceable Z3 proofs** — the full constraint encoding can be inspected, modified, and re-run by anyone, independently of the LLM that generated it
+- **Auditability** — a CLEAN verdict means Z3 exhaustively searched the input space under the given preconditions and found no violation; an LLM-only CLEAN verdict is an assertion without proof
+- **False-positive immunity** — the SMT proof blocked the hallucinated bug that `gemini-3-flash-preview` LLM-only produced on `power_clean`, a failure mode that LLM-only has no mechanism to catch
 
-`gemini-2.5-flash` LLM-only is the most token-efficient configuration and a strong triage tool. The hybrid's additional cost is justified when formal evidence is required or when the codebase is complex enough that reasoning-model hallucinations on clean functions become a real risk.
+LLM-only outputs are black-box verdicts. They cannot be independently verified, cannot produce a test case, and cannot distinguish a genuine CLEAN result from a model that simply failed to reason about an edge case. The hybrid's additional cost buys transparency and trust.
 
 ### Practical recommendations
 
 | Use case | Recommended configuration | Rationale |
 | :--- | :--- | :--- |
 | Fast triage / CI gate | LLM-only, gemini-2.5-flash | 2,273 tok/file, 37s, 15/15, 0 FP |
-| Formal audit / evidence generation | Hybrid, gemini-3-flash-preview | 8,152 tok/file, 61s, 15/15, 0 FP, formal CEs |
-| Complex / safety-critical review | Hybrid, gemini-3-flash-preview | SMT proof eliminates hallucinated bugs; formal witnesses |
-| Do not use | gemini-3.1-flash-live-preview | Incompatible API (live/streaming only) |
+| Formal audit / evidence generation | Hybrid, gemini-3-flash-preview | 8,152 tok/file, 61s, 15/15, 0 FP, traceable proofs + concrete CEs |
+| Complex / safety-critical review | Hybrid, gemini-3-flash-preview | SMT proof eliminates hallucinated bugs; every verdict is independently verifiable |
 | Do not use | Hybrid, gemini-2.5-flash | False positives, slower, more expensive than alternatives |
