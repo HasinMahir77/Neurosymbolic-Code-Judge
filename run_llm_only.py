@@ -32,6 +32,11 @@ GROUND_TRUTH = {
     "08_power_clean.py": "CLEAN",
     "09_fizzbuzz.py": "BUGGY",
     "10_abs_diff_clean.py": "CLEAN",
+    "11_isqrt.py": "BUGGY",
+    "12_mod_pow.py": "BUGGY",
+    "13_count_divisors.py": "BUGGY",
+    "14_running_total_clean.py": "CLEAN",
+    "15_is_prime.py": "BUGGY",
 }
 
 SYSTEM_PROMPT = """\

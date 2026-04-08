@@ -5,188 +5,277 @@
       "file": "01_binary_search.py",
       "verdict": "CLEAN",
       "ground_truth": "CLEAN",
-      "reasoning": "The binary_search function is a correct implementation of the algorithm. While the docstring mentions an 'integer overflow' bug, this is a common issue in languages with fixed-width integers (like C++ or Java) and does not exist in Python because its integers have arbitrary precision. The logic for the midpoint calculation, range narrowing, and termination conditions are all correct for Python semantics.",
+      "reasoning": "The binary_search function implements the standard binary search algorithm correctly. Although the docstring and a comment suggest a bug due to integer overflow in the midpoint calculation, this is not a bug in Python. Python's arbitrary-precision integers handle calculations like (lo + hi) // 2 without overflow, regardless of the size of the integers. The logic correctly handles all valid inputs, including cases where the target is at the boundaries, absent from the array, or when the array is empty.",
       "buggy_functions": [],
       "tokens": {
         "prompt_tokens": 482,
-        "completion_tokens": 106,
-        "total_tokens": 11677
+        "completion_tokens": 128,
+        "total_tokens": 13615
       },
-      "elapsed_s": 56.21
+      "elapsed_s": 63.88
     },
     {
       "file": "02_factorial.py",
       "verdict": "BUGGY",
       "ground_truth": "BUGGY",
-      "reasoning": "The factorial function returns 1 for negative inputs because the loop range(2, n + 1) is empty for any n < 2. While 0! and 1! are correctly 1, the factorial of a negative integer is undefined, making the return value of 1 incorrect.",
+      "reasoning": "The factorial function correctly computes n! for non-negative integers but returns 1 for negative integers because the loop range is empty. Since factorial is undefined for negative integers, returning 1 is an incorrect result.",
       "buggy_functions": [
         {
           "name": "factorial",
-          "bug": "The function returns 1 for negative inputs instead of raising an error or returning an undefined value.",
-          "counterexample": "-1"
+          "bug": "The function returns 1 for negative inputs instead of raising an error or handling the undefined case.",
+          "counterexample": "factorial(-1)"
         }
       ],
       "tokens": {
         "prompt_tokens": 387,
-        "completion_tokens": 141,
-        "total_tokens": 7677
+        "completion_tokens": 124,
+        "total_tokens": 5838
       },
-      "elapsed_s": 33.35
+      "elapsed_s": 27.12
     },
     {
       "file": "03_fibonacci.py",
       "verdict": "BUGGY",
       "ground_truth": "BUGGY",
-      "reasoning": "The fibonacci function has an incorrect base case. For n=0, it returns 1 instead of 0, which violates the docstring and the standard definition of the Fibonacci sequence. This error propagates to all subsequent values.",
+      "reasoning": "The fibonacci function has an incorrect base case. It returns 1 for n=0, whereas the docstring and standard definition specify fib(0) = 0. This error propagates, causing all subsequent values (except n=1) to be incorrect.",
       "buggy_functions": [
         {
           "name": "fibonacci",
-          "bug": "The base case returns 1 for n=0, but it should return 0.",
+          "bug": "The base case returns 1 for n=0 instead of 0, leading to incorrect results for n=0 and all n > 1.",
           "counterexample": "fibonacci(0)"
         }
       ],
       "tokens": {
         "prompt_tokens": 448,
-        "completion_tokens": 129,
-        "total_tokens": 1037
+        "completion_tokens": 148,
+        "total_tokens": 1339
       },
-      "elapsed_s": 4.36
+      "elapsed_s": 5.77
     },
     {
       "file": "04_is_palindrome.py",
-      "verdict": "BUGGY",
+      "verdict": "ERROR",
       "ground_truth": "BUGGY",
-      "reasoning": "The function reverse_number correctly reverses the digits of a non-negative integer. However, is_palindrome is buggy because it incorrectly returns False for n=0. The condition 'if n <= 0' excludes 0, but 0 is a non-negative integer and a palindrome by definition.",
-      "buggy_functions": [
-        {
-          "name": "is_palindrome",
-          "bug": "The condition 'if n <= 0' incorrectly returns False for n = 0, which is a palindrome and not a negative number.",
-          "counterexample": "is_palindrome(0)"
-        }
-      ],
+      "reasoning": "peer closed connection without sending complete message body (incomplete chunked read)",
+      "buggy_functions": [],
       "tokens": {
-        "prompt_tokens": 492,
-        "completion_tokens": 156,
-        "total_tokens": 8635
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
       },
-      "elapsed_s": 38.7
+      "elapsed_s": 231.45
     },
     {
       "file": "05_clamp_clean.py",
       "verdict": "CLEAN",
       "ground_truth": "CLEAN",
-      "reasoning": "The clamp function correctly restricts values to the specified range [low, high] by checking both boundaries. The scale function correctly multiplies the value by the given factor. The process function correctly chains these operations to map a 0-100 input range to a 0-255 output range, which is consistent with the provided docstrings and the mathematical requirements for mapping these ranges.",
+      "reasoning": "All functions correctly implement their intended logic. The clamp function handles boundary conditions as expected, the scale function performs standard multiplication, and the process function correctly chains these operations to map a 0-100 input range to a 0-255 output range.",
       "buggy_functions": [],
       "tokens": {
         "prompt_tokens": 479,
-        "completion_tokens": 107,
-        "total_tokens": 13273
+        "completion_tokens": 83,
+        "total_tokens": 1236
       },
-      "elapsed_s": 60.35
+      "elapsed_s": 4.98
     },
     {
       "file": "06_gcd.py",
       "verdict": "BUGGY",
       "ground_truth": "BUGGY",
-      "reasoning": "The `gcd` function can return negative values when one of the inputs is negative, which is mathematically incorrect as the greatest common divisor is defined as non-negative. The `lcm` function inherits this issue and also raises a `ZeroDivisionError` when both inputs are zero.",
+      "reasoning": "The gcd function returns a negative value when the divisor b is negative, which is mathematically incorrect as the GCD is defined as the greatest positive common divisor. The lcm function raises a ZeroDivisionError when both a and b are zero because gcd(0, 0) is 0.",
       "buggy_functions": [
         {
           "name": "gcd",
-          "bug": "Returns a negative value if the first non-zero result in the Euclidean algorithm is negative, which occurs with some negative inputs.",
-          "counterexample": "gcd(6, -3)"
+          "bug": "Returns a negative value when the divisor b is negative, violating the definition of GCD as non-negative.",
+          "counterexample": "gcd(3, -6)"
         },
         {
           "name": "lcm",
-          "bug": "Raises ZeroDivisionError if both a and b are 0, and can return negative values for negative inputs.",
+          "bug": "Raises ZeroDivisionError when both inputs are zero.",
           "counterexample": "lcm(0, 0)"
         }
       ],
       "tokens": {
         "prompt_tokens": 443,
-        "completion_tokens": 206,
-        "total_tokens": 63564
+        "completion_tokens": 190,
+        "total_tokens": 12847
       },
-      "elapsed_s": 221.84
+      "elapsed_s": 58.08
     },
     {
       "file": "07_max_subarray.py",
       "verdict": "BUGGY",
       "ground_truth": "BUGGY",
-      "reasoning": "max_crossing_sum uses a fixed small integer (-999999) as an initial value for its sums, which fails for very small negative numbers. max_subarray_sum fails to handle empty input ranges (lo > hi), which results in infinite recursion, and also inherits the incorrect result bug from max_crossing_sum.",
+      "reasoning": "max_crossing_sum uses a fixed constant -999999 for initialization, which fails for very small negative numbers. max_subarray_sum fails for empty arrays (lo > hi) and also inherits the bug from max_crossing_sum.",
       "buggy_functions": [
         {
           "name": "max_crossing_sum",
-          "bug": "Initializes left_sum and right_sum to -999999, which causes incorrect results if the actual subarray sums are smaller than this value.",
-          "counterexample": "max_crossing_sum([-2000000, -2000000], 0, 0, 1)"
+          "bug": "Initializes left_sum and right_sum to -999999, which produces incorrect results if the actual subarray sums are more negative than this constant.",
+          "counterexample": "max_crossing_sum([-1000000, -1000000], 0, 0, 1)"
         },
         {
           "name": "max_subarray_sum",
-          "bug": "Does not handle the case where lo > hi, leading to infinite recursion for empty arrays. It also returns incorrect results for arrays with very small negative numbers.",
+          "bug": "Does not handle the case where lo > hi (e.g., an empty array), leading to infinite recursion. It also produces incorrect results for very small negative numbers due to its reliance on max_crossing_sum.",
           "counterexample": "max_subarray_sum([], 0, -1)"
         }
       ],
       "tokens": {
         "prompt_tokens": 652,
-        "completion_tokens": 272,
-        "total_tokens": 63836
+        "completion_tokens": 269,
+        "total_tokens": 21090
       },
-      "elapsed_s": 238.1
+      "elapsed_s": 87.2
     },
     {
       "file": "08_power_clean.py",
-      "verdict": "CLEAN",
+      "verdict": "BUGGY",
       "ground_truth": "CLEAN",
-      "reasoning": "The `power` function implements the standard binary exponentiation algorithm (exponentiation by squaring). It correctly handles the base case (exp=0), even exponents (by recursing on exp // 2 and squaring the result), and odd exponents (by recursing on exp - 1). The docstring specifies it is correct for exp >= 0, and within this domain, the function produces correct results for all valid numeric bases (integers, floats, complex numbers) and terminates in logarithmic time. Python's arbitrary-precision integers prevent overflow issues.",
-      "buggy_functions": [],
+      "reasoning": "The power function fails for negative exponents, which are considered valid inputs because the docstring ('Correct for exp >= 0') does not explicitly forbid them. For negative exponents, the function enters an infinite recursion loop (e.g., power(base, -1) calls power(base, -2), which in turn calls power(base, -1)), eventually raising a RecursionError.",
+      "buggy_functions": [
+        {
+          "name": "power",
+          "bug": "The function enters an infinite recursion loop for negative exponents, leading to a RecursionError.",
+          "counterexample": "power(2, -1)"
+        }
+      ],
       "tokens": {
         "prompt_tokens": 421,
-        "completion_tokens": 141,
-        "total_tokens": 63476
+        "completion_tokens": 164,
+        "total_tokens": 16405
       },
-      "elapsed_s": 246.06
+      "elapsed_s": 78.22
     },
     {
       "file": "09_fizzbuzz.py",
       "verdict": "BUGGY",
       "ground_truth": "BUGGY",
-      "reasoning": "The classify function checks for divisibility by 3 and 5 before checking for divisibility by 15. Since any number divisible by 15 is also divisible by 3, the function returns 'Fizz' for multiples of 15 instead of 'FizzBuzz'.",
+      "reasoning": "The classify function incorrectly returns 'Fizz' for multiples of 15 because the check for divisibility by 3 is performed before the check for divisibility by 15. run_fizzbuzz correctly iterates through the range and collects the results from classify.",
       "buggy_functions": [
         {
           "name": "classify",
-          "bug": "The condition n % 15 == 0 is unreachable because multiples of 15 are caught by the n % 3 == 0 check first.",
-          "counterexample": "classify(15)"
+          "bug": "The check for n % 15 == 0 is unreachable because any number divisible by 15 is also divisible by 3, which is checked first.",
+          "counterexample": "15"
         }
       ],
       "tokens": {
         "prompt_tokens": 519,
-        "completion_tokens": 153,
-        "total_tokens": 1274
+        "completion_tokens": 148,
+        "total_tokens": 63582
       },
-      "elapsed_s": 4.77
+      "elapsed_s": 257.31
     },
     {
       "file": "10_abs_diff_clean.py",
       "verdict": "CLEAN",
       "ground_truth": "CLEAN",
-      "reasoning": "The function 'absolute' correctly implements the absolute value logic for all numeric inputs by returning the negation of negative values and the value itself otherwise. The function 'abs_diff' correctly utilizes 'absolute' to calculate the distance between two numbers.",
+      "reasoning": "The function absolute(x) correctly returns the absolute value of any number by checking if it is less than zero. The function abs_diff(a, b) correctly calculates the absolute difference by calling absolute(a - b). Both functions handle positive, negative, and zero values correctly.",
       "buggy_functions": [],
       "tokens": {
         "prompt_tokens": 412,
-        "completion_tokens": 77,
-        "total_tokens": 63401
+        "completion_tokens": 87,
+        "total_tokens": 1018
       },
-      "elapsed_s": 236.59
+      "elapsed_s": 4.15
+    },
+    {
+      "file": "11_isqrt.py",
+      "verdict": "BUGGY",
+      "ground_truth": "BUGGY",
+      "reasoning": "The isqrt function uses binary search to find the largest integer x such that x * x <= n. However, the condition mid * mid < n is used instead of mid * mid <= n. This causes the function to incorrectly exclude mid when mid * mid is exactly equal to n, resulting in an incorrect return value for perfect squares greater than 1.",
+      "buggy_functions": [
+        {
+          "name": "isqrt",
+          "bug": "The condition 'mid * mid < n' should be 'mid * mid <= n' to correctly handle cases where mid is the exact square root.",
+          "counterexample": "isqrt(4)"
+        }
+      ],
+      "tokens": {
+        "prompt_tokens": 516,
+        "completion_tokens": 167,
+        "total_tokens": 13723
+      },
+      "elapsed_s": 55.73
+    },
+    {
+      "file": "12_mod_pow.py",
+      "verdict": "BUGGY",
+      "ground_truth": "BUGGY",
+      "reasoning": "In the mod_pow function, the base is squared before it is multiplied into the result for the current bit of the exponent. This causes the function to compute (base ** (2 * exp)) % mod instead of (base ** exp) % mod for all exp > 0.",
+      "buggy_functions": [
+        {
+          "name": "mod_pow",
+          "bug": "The base is squared before it is multiplied into the result, causing the function to compute base^(2*exp) % mod instead of base^exp % mod.",
+          "counterexample": "mod_pow(2, 1, 10)"
+        }
+      ],
+      "tokens": {
+        "prompt_tokens": 560,
+        "completion_tokens": 165,
+        "total_tokens": 63636
+      },
+      "elapsed_s": 257.27
+    },
+    {
+      "file": "13_count_divisors.py",
+      "verdict": "BUGGY",
+      "ground_truth": "BUGGY",
+      "reasoning": "The function count_divisors overcounts divisors for perfect squares because it adds 2 to the count even when i and n // i are the same (i.e., when i * i == n).",
+      "buggy_functions": [
+        {
+          "name": "count_divisors",
+          "bug": "Overcounts divisors for perfect squares by adding 2 instead of 1 when i * i == n.",
+          "counterexample": "count_divisors(1)"
+        }
+      ],
+      "tokens": {
+        "prompt_tokens": 502,
+        "completion_tokens": 133,
+        "total_tokens": 63550
+      },
+      "elapsed_s": 228.21
+    },
+    {
+      "file": "14_running_total_clean.py",
+      "verdict": "CLEAN",
+      "ground_truth": "CLEAN",
+      "reasoning": "All three functions (running_max, running_min, and running_sum) correctly implement their respective operations. They handle empty input lists by returning an empty list, and they correctly initialize the result with the first element of the input before iterating through the remaining elements. The use of result[-1] to access the previous cumulative value is efficient and correct for these operations.",
+      "buggy_functions": [],
+      "tokens": {
+        "prompt_tokens": 716,
+        "completion_tokens": 104,
+        "total_tokens": 13876
+      },
+      "elapsed_s": 58.14
+    },
+    {
+      "file": "15_is_prime.py",
+      "verdict": "BUGGY",
+      "ground_truth": "BUGGY",
+      "reasoning": "The is_prime function incorrectly identifies perfect squares of primes as prime because the loop condition i * i < n skips the case where i is the square root of n.",
+      "buggy_functions": [
+        {
+          "name": "is_prime",
+          "bug": "The loop condition i * i < n excludes the square root of n, causing perfect squares of primes to be incorrectly identified as prime.",
+          "counterexample": "9"
+        }
+      ],
+      "tokens": {
+        "prompt_tokens": 543,
+        "completion_tokens": 124,
+        "total_tokens": 9474
+      },
+      "elapsed_s": 41.46
     }
   ],
   "summary": {
-    "tp": 6,
+    "tp": 9,
     "tn": 4,
-    "fp": 0,
+    "fp": 1,
     "fn": 0,
-    "errors": 0,
-    "accuracy": "10/10",
-    "total_tokens": 297850,
-    "avg_tokens_per_file": 29785,
-    "wall_time_s": 296.95
+    "errors": 1,
+    "accuracy": "13/15",
+    "total_tokens": 301229,
+    "avg_tokens_per_file": 20081,
+    "wall_time_s": 350.24
   }
 }
