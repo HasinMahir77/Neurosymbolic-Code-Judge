@@ -1,0 +1,192 @@
+{
+  "model": "gemini-3-flash-preview",
+  "results": [
+    {
+      "file": "01_binary_search.py",
+      "verdict": "CLEAN",
+      "ground_truth": "CLEAN",
+      "reasoning": "The binary_search function is a correct implementation of the algorithm. While the docstring mentions an 'integer overflow' bug, this is a common issue in languages with fixed-width integers (like C++ or Java) and does not exist in Python because its integers have arbitrary precision. The logic for the midpoint calculation, range narrowing, and termination conditions are all correct for Python semantics.",
+      "buggy_functions": [],
+      "tokens": {
+        "prompt_tokens": 482,
+        "completion_tokens": 106,
+        "total_tokens": 11677
+      },
+      "elapsed_s": 56.21
+    },
+    {
+      "file": "02_factorial.py",
+      "verdict": "BUGGY",
+      "ground_truth": "BUGGY",
+      "reasoning": "The factorial function returns 1 for negative inputs because the loop range(2, n + 1) is empty for any n < 2. While 0! and 1! are correctly 1, the factorial of a negative integer is undefined, making the return value of 1 incorrect.",
+      "buggy_functions": [
+        {
+          "name": "factorial",
+          "bug": "The function returns 1 for negative inputs instead of raising an error or returning an undefined value.",
+          "counterexample": "-1"
+        }
+      ],
+      "tokens": {
+        "prompt_tokens": 387,
+        "completion_tokens": 141,
+        "total_tokens": 7677
+      },
+      "elapsed_s": 33.35
+    },
+    {
+      "file": "03_fibonacci.py",
+      "verdict": "BUGGY",
+      "ground_truth": "BUGGY",
+      "reasoning": "The fibonacci function has an incorrect base case. For n=0, it returns 1 instead of 0, which violates the docstring and the standard definition of the Fibonacci sequence. This error propagates to all subsequent values.",
+      "buggy_functions": [
+        {
+          "name": "fibonacci",
+          "bug": "The base case returns 1 for n=0, but it should return 0.",
+          "counterexample": "fibonacci(0)"
+        }
+      ],
+      "tokens": {
+        "prompt_tokens": 448,
+        "completion_tokens": 129,
+        "total_tokens": 1037
+      },
+      "elapsed_s": 4.36
+    },
+    {
+      "file": "04_is_palindrome.py",
+      "verdict": "BUGGY",
+      "ground_truth": "BUGGY",
+      "reasoning": "The function reverse_number correctly reverses the digits of a non-negative integer. However, is_palindrome is buggy because it incorrectly returns False for n=0. The condition 'if n <= 0' excludes 0, but 0 is a non-negative integer and a palindrome by definition.",
+      "buggy_functions": [
+        {
+          "name": "is_palindrome",
+          "bug": "The condition 'if n <= 0' incorrectly returns False for n = 0, which is a palindrome and not a negative number.",
+          "counterexample": "is_palindrome(0)"
+        }
+      ],
+      "tokens": {
+        "prompt_tokens": 492,
+        "completion_tokens": 156,
+        "total_tokens": 8635
+      },
+      "elapsed_s": 38.7
+    },
+    {
+      "file": "05_clamp_clean.py",
+      "verdict": "CLEAN",
+      "ground_truth": "CLEAN",
+      "reasoning": "The clamp function correctly restricts values to the specified range [low, high] by checking both boundaries. The scale function correctly multiplies the value by the given factor. The process function correctly chains these operations to map a 0-100 input range to a 0-255 output range, which is consistent with the provided docstrings and the mathematical requirements for mapping these ranges.",
+      "buggy_functions": [],
+      "tokens": {
+        "prompt_tokens": 479,
+        "completion_tokens": 107,
+        "total_tokens": 13273
+      },
+      "elapsed_s": 60.35
+    },
+    {
+      "file": "06_gcd.py",
+      "verdict": "BUGGY",
+      "ground_truth": "BUGGY",
+      "reasoning": "The `gcd` function can return negative values when one of the inputs is negative, which is mathematically incorrect as the greatest common divisor is defined as non-negative. The `lcm` function inherits this issue and also raises a `ZeroDivisionError` when both inputs are zero.",
+      "buggy_functions": [
+        {
+          "name": "gcd",
+          "bug": "Returns a negative value if the first non-zero result in the Euclidean algorithm is negative, which occurs with some negative inputs.",
+          "counterexample": "gcd(6, -3)"
+        },
+        {
+          "name": "lcm",
+          "bug": "Raises ZeroDivisionError if both a and b are 0, and can return negative values for negative inputs.",
+          "counterexample": "lcm(0, 0)"
+        }
+      ],
+      "tokens": {
+        "prompt_tokens": 443,
+        "completion_tokens": 206,
+        "total_tokens": 63564
+      },
+      "elapsed_s": 221.84
+    },
+    {
+      "file": "07_max_subarray.py",
+      "verdict": "BUGGY",
+      "ground_truth": "BUGGY",
+      "reasoning": "max_crossing_sum uses a fixed small integer (-999999) as an initial value for its sums, which fails for very small negative numbers. max_subarray_sum fails to handle empty input ranges (lo > hi), which results in infinite recursion, and also inherits the incorrect result bug from max_crossing_sum.",
+      "buggy_functions": [
+        {
+          "name": "max_crossing_sum",
+          "bug": "Initializes left_sum and right_sum to -999999, which causes incorrect results if the actual subarray sums are smaller than this value.",
+          "counterexample": "max_crossing_sum([-2000000, -2000000], 0, 0, 1)"
+        },
+        {
+          "name": "max_subarray_sum",
+          "bug": "Does not handle the case where lo > hi, leading to infinite recursion for empty arrays. It also returns incorrect results for arrays with very small negative numbers.",
+          "counterexample": "max_subarray_sum([], 0, -1)"
+        }
+      ],
+      "tokens": {
+        "prompt_tokens": 652,
+        "completion_tokens": 272,
+        "total_tokens": 63836
+      },
+      "elapsed_s": 238.1
+    },
+    {
+      "file": "08_power_clean.py",
+      "verdict": "CLEAN",
+      "ground_truth": "CLEAN",
+      "reasoning": "The `power` function implements the standard binary exponentiation algorithm (exponentiation by squaring). It correctly handles the base case (exp=0), even exponents (by recursing on exp // 2 and squaring the result), and odd exponents (by recursing on exp - 1). The docstring specifies it is correct for exp >= 0, and within this domain, the function produces correct results for all valid numeric bases (integers, floats, complex numbers) and terminates in logarithmic time. Python's arbitrary-precision integers prevent overflow issues.",
+      "buggy_functions": [],
+      "tokens": {
+        "prompt_tokens": 421,
+        "completion_tokens": 141,
+        "total_tokens": 63476
+      },
+      "elapsed_s": 246.06
+    },
+    {
+      "file": "09_fizzbuzz.py",
+      "verdict": "BUGGY",
+      "ground_truth": "BUGGY",
+      "reasoning": "The classify function checks for divisibility by 3 and 5 before checking for divisibility by 15. Since any number divisible by 15 is also divisible by 3, the function returns 'Fizz' for multiples of 15 instead of 'FizzBuzz'.",
+      "buggy_functions": [
+        {
+          "name": "classify",
+          "bug": "The condition n % 15 == 0 is unreachable because multiples of 15 are caught by the n % 3 == 0 check first.",
+          "counterexample": "classify(15)"
+        }
+      ],
+      "tokens": {
+        "prompt_tokens": 519,
+        "completion_tokens": 153,
+        "total_tokens": 1274
+      },
+      "elapsed_s": 4.77
+    },
+    {
+      "file": "10_abs_diff_clean.py",
+      "verdict": "CLEAN",
+      "ground_truth": "CLEAN",
+      "reasoning": "The function 'absolute' correctly implements the absolute value logic for all numeric inputs by returning the negation of negative values and the value itself otherwise. The function 'abs_diff' correctly utilizes 'absolute' to calculate the distance between two numbers.",
+      "buggy_functions": [],
+      "tokens": {
+        "prompt_tokens": 412,
+        "completion_tokens": 77,
+        "total_tokens": 63401
+      },
+      "elapsed_s": 236.59
+    }
+  ],
+  "summary": {
+    "tp": 6,
+    "tn": 4,
+    "fp": 0,
+    "fn": 0,
+    "errors": 0,
+    "accuracy": "10/10",
+    "total_tokens": 297850,
+    "avg_tokens_per_file": 29785,
+    "wall_time_s": 296.95
+  }
+}

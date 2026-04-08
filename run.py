@@ -3,6 +3,7 @@ import sys
 import json
 import glob
 import time
+import argparse
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -13,11 +14,14 @@ MAX_PARALLEL = 5  # Run up to 5 files concurrently
 _NSJUDGE = os.path.join(os.path.dirname(sys.executable), "nsjudge")
 
 
-def _evaluate_file(f: str) -> dict:
+def _evaluate_file(f: str, model: str | None = None) -> dict:
     """Run nsjudge on a single file and return a result dict."""
     cmd = [_NSJUDGE, f, "--json"]
+    env = os.environ.copy()
+    if model:
+        env["GEMINI_MODEL"] = model
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True)
+        proc = subprocess.run(cmd, capture_output=True, text=True, env=env)
         if proc.returncode != 0 and not proc.stdout.strip():
             return {"file": f, "status": "ProcessError", "error": proc.stderr}
         try:
@@ -36,7 +40,7 @@ def _evaluate_file(f: str) -> dict:
         return {"file": f, "status": "Exception", "error": str(e)}
 
 
-def run_dataset_benchmark():
+def run_dataset_benchmark(model: str | None = None):
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
     dataset_dir = "dataset"
@@ -49,8 +53,10 @@ def run_dataset_benchmark():
         print(f"No python files found in '{dataset_dir}/'.")
         sys.exit(0)
 
+    model_label = model or "gemini-3-flash-preview"
     print("==================================================")
     print("  Neuro-Symbolic Judge - Dataset Benchmark Runner ")
+    print(f"  Model: {model_label}")
     print(f"  Running {len(test_files)} files ({MAX_PARALLEL} in parallel)")
     print("==================================================")
 
@@ -59,7 +65,7 @@ def run_dataset_benchmark():
     start_time = time.time()
 
     with ThreadPoolExecutor(max_workers=MAX_PARALLEL) as executor:
-        future_to_file = {executor.submit(_evaluate_file, f): f for f in test_files}
+        future_to_file = {executor.submit(_evaluate_file, f, model): f for f in test_files}
         completed = 0
         for future in as_completed(future_to_file):
             completed += 1
@@ -120,14 +126,16 @@ def run_dataset_benchmark():
     print(f"  Uncertain (errors):     {uncertain}")
     print("==================================================\n")
 
-    # Save aggregated JSON
-    json_path = os.path.join(RESULTS_DIR, "benchmark_results.json")
+    # Derive file slug from model name
+    safe_model = model_label.replace("/", "-")
+    json_path = os.path.join(RESULTS_DIR, f"benchmark_results_{safe_model}.json")
     with open(json_path, "w") as f:
         json.dump(results, f, indent=2)
     print(f"Detailed results saved to {json_path}")
 
     # Generate and save Markdown table
     md_content = ["# Benchmark Results\n"]
+    md_content.append(f"**Model:** {model_label}  ")
     md_content.append(f"**Total Time:** {elapsed:.2f} seconds\n")
     md_content.append("| File | Verdict | Details |")
     md_content.append("| :--- | :--- | :--- |")
@@ -143,7 +151,7 @@ def run_dataset_benchmark():
     md_content.append(f"**Clean scripts verified:** {clean_count}  ")
     md_content.append(f"**Uncertain (errors):** {uncertain_count}  ")
 
-    md_path = os.path.join(RESULTS_DIR, "benchmark_results.md")
+    md_path = os.path.join(RESULTS_DIR, f"benchmark_results_{safe_model}.md")
     with open(md_path, "w") as f:
         f.write("\n".join(md_content) + "\n")
     print(f"Markdown table saved to {md_path}")
@@ -152,7 +160,12 @@ def run_unit_tests():
     subprocess.run(["pytest", "tests/", "-v"])
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] in ("--unit", "-u"):
+    parser = argparse.ArgumentParser(description="NSJudge benchmark runner")
+    parser.add_argument("--unit", "-u", action="store_true", help="Run unit tests")
+    parser.add_argument("--model", "-m", default=None, help="Gemini model name to use")
+    args = parser.parse_args()
+
+    if args.unit:
         run_unit_tests()
     else:
-        run_dataset_benchmark()
+        run_dataset_benchmark(model=args.model)

@@ -1,0 +1,146 @@
+{
+  "model": "gemini-3.1-flash-live-preview",
+  "results": [
+    {
+      "file": "01_binary_search.py",
+      "verdict": "ERROR",
+      "ground_truth": "CLEAN",
+      "reasoning": "additionalProperties is not supported in the Gemini API.",
+      "buggy_functions": [],
+      "tokens": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      },
+      "elapsed_s": 0.0
+    },
+    {
+      "file": "02_factorial.py",
+      "verdict": "ERROR",
+      "ground_truth": "BUGGY",
+      "reasoning": "additionalProperties is not supported in the Gemini API.",
+      "buggy_functions": [],
+      "tokens": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      },
+      "elapsed_s": 0.0
+    },
+    {
+      "file": "03_fibonacci.py",
+      "verdict": "ERROR",
+      "ground_truth": "BUGGY",
+      "reasoning": "additionalProperties is not supported in the Gemini API.",
+      "buggy_functions": [],
+      "tokens": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      },
+      "elapsed_s": 0.0
+    },
+    {
+      "file": "04_is_palindrome.py",
+      "verdict": "ERROR",
+      "ground_truth": "BUGGY",
+      "reasoning": "additionalProperties is not supported in the Gemini API.",
+      "buggy_functions": [],
+      "tokens": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      },
+      "elapsed_s": 0.0
+    },
+    {
+      "file": "05_clamp_clean.py",
+      "verdict": "ERROR",
+      "ground_truth": "CLEAN",
+      "reasoning": "additionalProperties is not supported in the Gemini API.",
+      "buggy_functions": [],
+      "tokens": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      },
+      "elapsed_s": 0.0
+    },
+    {
+      "file": "06_gcd.py",
+      "verdict": "ERROR",
+      "ground_truth": "BUGGY",
+      "reasoning": "additionalProperties is not supported in the Gemini API.",
+      "buggy_functions": [],
+      "tokens": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      },
+      "elapsed_s": 0.0
+    },
+    {
+      "file": "07_max_subarray.py",
+      "verdict": "ERROR",
+      "ground_truth": "BUGGY",
+      "reasoning": "additionalProperties is not supported in the Gemini API.",
+      "buggy_functions": [],
+      "tokens": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      },
+      "elapsed_s": 0.0
+    },
+    {
+      "file": "08_power_clean.py",
+      "verdict": "ERROR",
+      "ground_truth": "CLEAN",
+      "reasoning": "additionalProperties is not supported in the Gemini API.",
+      "buggy_functions": [],
+      "tokens": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      },
+      "elapsed_s": 0.0
+    },
+    {
+      "file": "09_fizzbuzz.py",
+      "verdict": "ERROR",
+      "ground_truth": "BUGGY",
+      "reasoning": "additionalProperties is not supported in the Gemini API.",
+      "buggy_functions": [],
+      "tokens": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      },
+      "elapsed_s": 0.0
+    },
+    {
+      "file": "10_abs_diff_clean.py",
+      "verdict": "ERROR",
+      "ground_truth": "CLEAN",
+      "reasoning": "additionalProperties is not supported in the Gemini API.",
+      "buggy_functions": [],
+      "tokens": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      },
+      "elapsed_s": 0.0
+    }
+  ],
+  "summary": {
+    "tp": 0,
+    "tn": 0,
+    "fp": 0,
+    "fn": 0,
+    "errors": 10,
+    "accuracy": "0/10",
+    "total_tokens": 0,
+    "avg_tokens_per_file": 0,
+    "wall_time_s": 0.01
+  }
+}
