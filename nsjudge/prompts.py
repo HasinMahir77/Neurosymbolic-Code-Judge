@@ -62,117 +62,82 @@ else:
 - Use `Int` for integers, `Real` for floats, `Bool` for booleans.
 - For array/list operations, model the relevant properties (length, element \
   access) rather than the full data structure.
+- NEVER index a Python list with a Z3 symbolic variable — Python requires \
+  concrete integer indices. For symbolic array access, use `If` chains: \
+  `If(idx == 0, arr[0], If(idx == 1, arr[1], arr[2]))`.
 - Always print exactly "VERIFIED" or "COUNTEREXAMPLE" — the sandbox parses this.
 
 ## Handling Loops and Recursion
 
-When a function contains an unbounded `while` loop or recursive calls, do NOT \
-model it using `ForAll` quantifiers over unbounded integer ranges. This causes \
-Z3 to time out or produce incorrect results. Use one of these two strategies:
+NEVER use `ForAll` quantifiers — Z3 times out on them. Use one of:
 
-**Strategy A — Model the mathematical invariant directly (preferred):**
-For loops that compute a well-known mathematical result, assert the closed-form \
-property instead of simulating execution step by step.
-
-Example — GCD via Euclidean algorithm (`while b != 0: a, b = b, a % b`):
-```python
-from z3 import *
-s = Solver()
-a, b = Ints('a b')
-result = Int('result')
-s.add(a > 0, b > 0)
-# Mathematical properties of GCD (what the result MUST satisfy)
-s.add(result > 0)
-s.add(a % result == 0)   # result divides a
-s.add(b % result == 0)   # result divides b
-# Negation: claim a strictly larger common divisor can exist
-bigger = Int('bigger')
-s.add(bigger > result, a % bigger == 0, b % bigger == 0)
-if s.check() == sat:
-    print("COUNTEREXAMPLE")
-    m = s.model()
-    for d in m.decls():
-        print(f"  {d.name()} = {m[d]}")
-else:
-    print("VERIFIED")
-```
-
-**Strategy B — Bounded unrolling (use when no closed-form invariant is obvious):**
-For recursive functions (e.g., `power(base, exp)` via repeated squaring), \
-restrict the input domain to small concrete values using `If` chains:
-```python
-from z3 import *
-s = Solver()
-base, exp = Ints('base exp')
-s.add(exp >= 0, exp <= 4)   # small bounded domain
-result = If(exp == 0, 1,
-        If(exp == 1, base,
-        If(exp == 2, base * base,
-        If(exp == 3, base * base * base,
-                     base * base * base * base))))
-# Negate the postcondition: result should equal base^exp
-# (here: result >= 0 when base >= 0)
-s.add(base >= 0)
-s.add(Not(result >= 0))
-if s.check() == sat:
-    print("COUNTEREXAMPLE")
-    m = s.model()
-    for d in m.decls():
-        print(f"  {d.name()} = {m[d]}")
-else:
-    print("VERIFIED")
-```
-
-NEVER write `ForAll([i], ...)` or `ForAll([x], Implies(...))` in your Z3 \
-scripts. Z3's quantifier reasoning is incomplete and will time out.
+- **Invariant strategy (preferred):** For a loop computing a mathematical \
+  result, assert its mathematical properties directly rather than simulating \
+  execution. For a divisibility-based loop, assert the mathematical \
+  postcondition (e.g., that the result divides each input and is maximal) \
+  and negate it. No loop simulation needed.
+- **Bounded unrolling:** For recursion over a numeric parameter, restrict \
+  to a small domain (e.g., `s.add(n >= 0, n <= 4)`) and use nested `If` \
+  chains to model each case explicitly. The bound is a **modeling artifact \
+  only** — do not treat it as a real precondition of the function, and do \
+  not flag callers that pass values outside the bound as bugs.
 
 ## Avoiding Z3 Incompleteness
 
-Z3 is **incomplete** for theories involving universal quantifiers (`ForAll`). \
-This means a script using `ForAll` can return `unsat` (VERIFIED) even when a \
-real bug exists, producing false negatives.
+`ForAll` makes Z3 incomplete — it may return UNSAT (VERIFIED) even when bugs \
+exist. Rules:
 
-Rules to avoid false negatives:
+- NEVER use `ForAll` for array sums, loop accumulators, or any list operation.
+- Use **concrete small arrays**: `arr = [Int(f'a{i}') for i in range(4)]`.
+- Compute sums directly: `total = arr[0] + arr[1] + arr[2]` — not with axioms.
+- Always let `n = 0` be reachable; do not add `s.add(n > 0)` unless the \
+  function explicitly requires positive input.
 
-1. NEVER use `ForAll` to model array sums, loop accumulators, or list operations.
-2. For functions operating on arrays or lists, use **concrete small arrays** \
-   with 3–5 symbolic integer elements:
-   ```python
-   n = 4
-   arr = [Int(f'a{i}') for i in range(n)]
-   ```
-3. Compute sums directly at the Python level over symbolic variables — do NOT \
-   use uninterpreted `Function` symbols with ForAll axioms:
-   ```python
-   # GOOD — concrete, Z3-complete:
-   total = arr[0] + arr[1] + arr[2]
-   # BAD — quantified, Z3 may miss bugs:
-   # s.add(ForAll([i], Implies(i >= 0, Sum(i+1) == Sum(i) + arr[i])))
-   ```
-4. Always test the edge case where `n = 0` or the array is logically empty. \
-   If the function has special behavior for zero-length input, make sure your \
-   Z3 model exercises that path.
+## Preconditions and Boundary Conditions
 
-## Boundary Conditions
+**The single most common mistake is adding preconditions that are too strict.**
+A precondition is only valid if the operation is mathematically impossible \
+without it (e.g., dividing by zero, taking a square root of a negative, \
+accessing index `i` of an array of known size `n` when `i >= n`). Do NOT add:
 
-Bugs most often appear at the edges of the input domain. Your Z3 script MUST \
-cover these cases unless the original function explicitly documents they are \
-excluded:
+- `s.add(n >= 0)` just because the implementation uses `range(n)` — the \
+  implementation may be buggy for negative `n`, and that is exactly what you \
+  must test.
+- `s.add(count >= 1)` just because the function accesses `arr[0]` before the \
+  loop — `count=0` is a valid input and may expose a missing guard.
+- `s.add(a > 0)` just because the algorithm was designed for positive integers \
+  — negative inputs are valid test cases unless the docstring explicitly \
+  forbids them.
+- `s.add(lo <= hi)` just because the algorithm assumes a valid range — an \
+  empty or inverted range may expose a missing base case. **If you add \
+  `s.add(lo <= hi)` and the function has no base case for `lo > hi`, you will \
+  always get VERIFIED and miss the bug entirely.**
 
-1. **n = 0 / empty input**: Add a test or at minimum ensure your symbolic `n` \
-   is unconstrained enough to be 0. Do not add `s.add(n > 0)` unless the \
-   function's docstring requires positive input.
-2. **Negative inputs**: If the function does not document that inputs are \
-   non-negative, do NOT add `s.add(x >= 0)`. Let Z3 search negative values.
-3. **Divisibility combinations**: For modular arithmetic (e.g., FizzBuzz), \
-   test values divisible by each divisor independently AND in combination. \
-   A value like `n = 15` (divisible by both 3 and 5) must be reachable in \
-   your Z3 model.
-4. **Single-element or minimal inputs**: Test `n = 1`, a one-element array, or \
-   the smallest valid input.
+If you are unsure whether a precondition is needed, leave it out. A \
+counterexample found on an unconstrained input is a real bug. A "VERIFIED" \
+result from an over-constrained model is a false negative.
 
-Keep preconditions **minimal**. Over-constraining the input domain hides bugs \
-by excluding the exact inputs where they occur.
+- Always test: `n = 0`, `n < 0`, single-element inputs, and both sides of \
+  every conditional boundary.
+- For modular arithmetic, ensure values divisible by each divisor independently \
+  AND in combination are reachable in your model.
+
+## Python Integer Semantics
+
+Python integers are **arbitrary precision** — they never overflow. Do NOT \
+simulate fixed-width integer overflow (e.g., 32-bit or 64-bit wraparound) \
+in your Z3 model. Specifically:
+
+- Do NOT add `% (2**32)` or `% (2**64)` or similar modular wrappers to \
+  arithmetic expressions.
+- Do NOT constrain `lo` and `hi` to be less than `2**31` or any other \
+  platform-specific bound.
+- `(lo + hi) // 2` in Python never overflows regardless of how large `lo` \
+  and `hi` are — model it as plain Z3 integer arithmetic.
+
+If you recognise a classic C/Java bug (e.g., midpoint overflow in binary \
+search), verify whether it can actually occur in Python before flagging it. \
+If it cannot, the function is correct and should be VERIFIED.
 """
 
 CONTRACT_GENERATION_PROMPT = """\
@@ -187,6 +152,14 @@ CONTRACT_GENERATION_PROMPT = """\
 - Parameters: {parameters}
 
 {dependency_context}\
+
+If this function calls other functions that are NOT listed under Verified \
+Dependencies above, model their INTENDED mathematical behavior as a direct \
+axiom — do not attempt to simulate their loop or recursive structure. For \
+example, if a function calls a helper `f(x)` with no verified contract, \
+introduce a symbolic result variable and assert its mathematical postcondition \
+directly (e.g., divisibility, bounds, or ordering properties) rather than \
+attempting to re-simulate its implementation.
 
 Respond with a JSON object matching this exact schema:
 {{

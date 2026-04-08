@@ -29,12 +29,26 @@ class SemanticTranslator:
     def __init__(self, settings: Settings) -> None:
         self._client = genai.Client(api_key=settings.gemini_api_key)
         self._model = settings.gemini_model
-        self._config = types.GenerateContentConfig(
+
+        base = dict(
             system_instruction=SYSTEM_PROMPT,
             response_mime_type="application/json",
             response_schema=FunctionContract,
             temperature=0.2,
         )
+
+        if settings.thinking_budget < 0:
+            # Always use full thinking — no fast path
+            self._config = types.GenerateContentConfig(**base)
+            self._thinking_config = self._config
+        else:
+            # Fast path: thinking disabled
+            self._config = types.GenerateContentConfig(
+                **base,
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
+            )
+            # Escalation path: full thinking (unlimited)
+            self._thinking_config = types.GenerateContentConfig(**base)
 
     def generate_contract(
         self,

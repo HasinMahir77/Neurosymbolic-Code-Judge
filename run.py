@@ -4,8 +4,36 @@ import json
 import glob
 import time
 import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 RESULTS_DIR = os.path.join("ResultAnalysis", "Benchmarks")
+MAX_PARALLEL = 5  # Run up to 5 files concurrently
+
+
+_NSJUDGE = os.path.join(os.path.dirname(sys.executable), "nsjudge")
+
+
+def _evaluate_file(f: str) -> dict:
+    """Run nsjudge on a single file and return a result dict."""
+    cmd = [_NSJUDGE, f, "--json"]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0 and not proc.stdout.strip():
+            return {"file": f, "status": "ProcessError", "error": proc.stderr}
+        try:
+            output_json = json.loads(proc.stdout)
+            return {
+                "file": f,
+                "status": "Completed",
+                "verified": len(output_json.get("verified", [])),
+                "counterexamples": len(output_json.get("counterexamples", [])),
+                "errors": len(output_json.get("errors", [])),
+                "raw_data": output_json,
+            }
+        except json.JSONDecodeError:
+            return {"file": f, "status": "ParseError", "raw_stdout": proc.stdout}
+    except Exception as e:
+        return {"file": f, "status": "Exception", "error": str(e)}
 
 
 def run_dataset_benchmark():
@@ -23,53 +51,27 @@ def run_dataset_benchmark():
 
     print("==================================================")
     print("  Neuro-Symbolic Judge - Dataset Benchmark Runner ")
+    print(f"  Running {len(test_files)} files ({MAX_PARALLEL} in parallel)")
     print("==================================================")
-    
+
     total_files = len(test_files)
-    results = []
+    results_map: dict[str, dict] = {}
     start_time = time.time()
 
-    for idx, f in enumerate(test_files, start=1):
-        print(f"\n[{idx}/{total_files}] Evaluating {f} ...")
-        
-        # We run the command and request JSON output for easy aggregation
-        cmd = ["nsjudge", f, "--json"]
-        
-        try:
-            # capture_output to parse json, but user won't see LLM progression real-time.
-            # To fix this, we'll let nsjudge run, but nsjudge's --json flag makes it mostly silent until the end.
-            proc = subprocess.run(cmd, capture_output=True, text=True)
-            
-            if proc.returncode != 0 and not proc.stdout.strip():
-                print(f"  -> Process Error:")
-                print(proc.stderr)
-                results.append({"file": f, "status": "ProcessError", "error": proc.stderr})
-                continue
-            
-            # Extract JSON from stdout
-            try:
-                output_json = json.loads(proc.stdout)
-                summary = output_json.get("summary", "No summary")
-                print(f"  -> {summary}")
-                
-                results.append({
-                    "file": f,
-                    "status": "Completed",
-                    "verified": len(output_json.get("verified", [])),
-                    "counterexamples": len(output_json.get("counterexamples", [])),
-                    "errors": len(output_json.get("errors", [])),
-                    "raw_data": output_json
-                })
-            except json.JSONDecodeError:
-                print("  -> Could not parse JSON output. Raw output was:")
-                print(proc.stdout)
-                if proc.stderr: print("Stderr:", proc.stderr)
-                
-                results.append({"file": f, "status": "ParseError", "raw_stdout": proc.stdout})
+    with ThreadPoolExecutor(max_workers=MAX_PARALLEL) as executor:
+        future_to_file = {executor.submit(_evaluate_file, f): f for f in test_files}
+        completed = 0
+        for future in as_completed(future_to_file):
+            completed += 1
+            f = future_to_file[future]
+            result = future.result()
+            results_map[f] = result
+            summary = result.get("raw_data", {}).get("summary", result.get("status", "?"))
+            elapsed = time.time() - start_time
+            print(f"  [{completed}/{total_files}] {os.path.basename(f)}: {summary}  ({elapsed:.0f}s elapsed)")
 
-        except Exception as e:
-            print(f"  -> Execution Failed: {e}")
-            results.append({"file": f, "status": "Exception", "error": str(e)})
+    # Restore sorted order for deterministic output
+    results = [results_map[f] for f in test_files]
 
     # Print Summary Table
     elapsed = time.time() - start_time
@@ -77,27 +79,45 @@ def run_dataset_benchmark():
     print(f"Benchmark Completed in {elapsed:.2f} seconds")
     print("==================================================")
     
-    total_verified = 0
-    total_counterexamples = 0
-    total_errors = 0
-    
-    print(f"{'File':<25} | {'Verified':<8} | {'Bugs Found':<10} | {'Errors':<6}")
-    print("-" * 59)
+    uncertain = 0
+
+    def _script_verdict(r: dict) -> tuple[str, str]:
+        """Return (verdict, detail) for a result, ignoring 'main' counterexamples."""
+        if r.get("status") != "Completed":
+            return "ERROR", r.get("status", "?")
+        raw = r.get("raw_data", {})
+        # Counterexamples from non-main functions only
+        real_ces = [
+            ce for ce in raw.get("counterexamples", [])
+            if ce.get("function_name") != "main"
+        ]
+        err = r.get("errors", 0)
+        v = r.get("verified", 0)
+        if real_ces:
+            fns = ", ".join(ce["function_name"] for ce in real_ces)
+            return "BUGGY", f"bug in: {fns}"
+        elif err > 0:
+            return "UNCERTAIN", f"{v} verified, {err} error(s)"
+        else:
+            return "CLEAN", f"{v} function(s) verified"
+
+    print(f"{'File':<25} | {'Verdict':<8} | {'Details'}")
+    print("-" * 70)
+    verdicts = {}
     for r in results:
         file_base = os.path.basename(r.get("file", ""))
-        if r.get("status") == "Completed":
-            v = r.get("verified", 0)
-            ce = r.get("counterexamples", 0)
-            err = r.get("errors", 0)
-            total_verified += v
-            total_counterexamples += ce
-            total_errors += err
-            print(f"{file_base:<25} | {v:<8} | {ce:<10} | {err:<6}")
-        else:
-            print(f"{file_base:<25} | Status: {r.get('status')}")
-            
-    print("-" * 59)
-    print(f"{'TOTALS':<25} | {total_verified:<8} | {total_counterexamples:<10} | {total_errors:<6}")
+        verdict, detail = _script_verdict(r)
+        verdicts[file_base] = verdict
+        if verdict in ("ERROR", "UNCERTAIN"):
+            uncertain += 1
+        print(f"{file_base:<25} | {verdict:<8} | {detail}")
+
+    buggy_count = sum(1 for v in verdicts.values() if v == "BUGGY")
+    clean_count = sum(1 for v in verdicts.values() if v == "CLEAN")
+    print("-" * 70)
+    print(f"  Buggy scripts detected: {buggy_count}")
+    print(f"  Clean scripts verified: {clean_count}")
+    print(f"  Uncertain (errors):     {uncertain}")
     print("==================================================\n")
 
     # Save aggregated JSON
@@ -109,20 +129,19 @@ def run_dataset_benchmark():
     # Generate and save Markdown table
     md_content = ["# Benchmark Results\n"]
     md_content.append(f"**Total Time:** {elapsed:.2f} seconds\n")
-    md_content.append("| File | Verified | Bugs Found | Errors |")
-    md_content.append("| :--- | :--- | :--- | :--- |")
+    md_content.append("| File | Verdict | Details |")
+    md_content.append("| :--- | :--- | :--- |")
 
     for r in results:
         file_base = os.path.basename(r.get("file", ""))
-        if r.get("status") == "Completed":
-            v = r.get("verified", 0)
-            ce = r.get("counterexamples", 0)
-            err = r.get("errors", 0)
-            md_content.append(f"| {file_base} | {v} | {ce} | {err} |")
-        else:
-            md_content.append(f"| {file_base} | {r.get('status')} | | |")
+        verdict, detail = _script_verdict(r)
+        md_content.append(f"| {file_base} | {verdict} | {detail} |")
 
-    md_content.append(f"| **TOTALS** | **{total_verified}** | **{total_counterexamples}** | **{total_errors}** |")
+    uncertain_count = sum(1 for v in verdicts.values() if v in ("ERROR", "UNCERTAIN"))
+    md_content.append("")
+    md_content.append(f"**Buggy scripts detected:** {buggy_count}  ")
+    md_content.append(f"**Clean scripts verified:** {clean_count}  ")
+    md_content.append(f"**Uncertain (errors):** {uncertain_count}  ")
 
     md_path = os.path.join(RESULTS_DIR, "benchmark_results.md")
     with open(md_path, "w") as f:

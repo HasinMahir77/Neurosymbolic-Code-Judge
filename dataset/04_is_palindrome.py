@@ -8,10 +8,11 @@ def reverse_number(n):
 
 
 def is_palindrome(n):
-    """Check if a non-negative integer is a palindrome.
-    Bug: returns True for n=0 via reverse_number, but fails for
-    negative numbers (no guard).
+    """Check if an integer is a palindrome.
+    Negative numbers are not considered palindromes.
     """
+    if n <= 0:  # Bug: should be n < 0; rejects 0 which is a valid palindrome
+        return False
     return n == reverse_number(n)
 
 
@@ -19,3 +20,4 @@ def main():
     print(is_palindrome(121))
     print(is_palindrome(123))
     print(is_palindrome(-121))
+    print(is_palindrome(0))

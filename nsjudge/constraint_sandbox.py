@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -25,7 +26,7 @@ class ConstraintSandbox:
                 tmp_path = Path(f.name)
 
             result = subprocess.run(
-                ["python", str(tmp_path)],
+                [sys.executable, str(tmp_path)],
                 capture_output=True,
                 text=True,
                 timeout=self._timeout,

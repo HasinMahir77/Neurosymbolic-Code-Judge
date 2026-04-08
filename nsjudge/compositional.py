@@ -49,6 +49,7 @@ class CompositionalVerifier:
 
         result = self._sandbox.execute(func_info.name, contract.z3_script)
 
+        # On error: retry with the traceback as context (no thinking escalation)
         attempt = 1
         while result.status == "error" and attempt < self._max_attempts:
             attempt += 1

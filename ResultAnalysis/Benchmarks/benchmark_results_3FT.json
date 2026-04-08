@@ -1,0 +1,706 @@
+[
+  {
+    "file": "dataset/01_binary_search.py",
+    "status": "Completed",
+    "verified": 2,
+    "counterexamples": 0,
+    "errors": 0,
+    "raw_data": {
+      "file_path": "dataset/01_binary_search.py",
+      "total_functions": 2,
+      "verified": [
+        {
+          "function_name": "binary_search",
+          "contract": {
+            "function_name": "binary_search",
+            "preconditions": [
+              "arr is sorted in non-decreasing order",
+              "lo_init and hi_init are valid indices within the array bounds [0, n-1]"
+            ],
+            "postconditions": [
+              "If target is found, result is the index such that arr[result] == target",
+              "If target is not found, result is -1 and no index in [lo_init, hi_init] contains target"
+            ],
+            "z3_script": "from z3 import *\n\ns = Solver()\n\n# 1. Symbolic inputs\nn = 4\narr = [Int(f'a{i}') for i in range(n)]\ntarget, lo_init, hi_init = Ints('target lo_init hi_init')\n\n# 2. Preconditions\n# Array is sorted\nfor i in range(n - 1):\n    s.add(arr[i] <= arr[i+1])\n# lo and hi are within bounds\ns.add(lo_init >= 0)\ns.add(hi_init < n)\n\n# Helper for array access\ndef get_val(idx):\n    return If(idx == 0, arr[0], If(idx == 1, arr[1], If(idx == 2, arr[2], arr[3])))\n\n# 3. Model the function logic (unrolled loop for N=4)\n# Iteration 1\nactive0 = lo_init <= hi_init\nmid0 = (lo_init + hi_init) / 2\nval0 = get_val(mid0)\nfound0 = And(active0, val0 == target)\nlo1 = If(And(active0, Not(found0), val0 < target), mid0 + 1, lo_init)\nhi1 = If(And(active0, Not(found0), val0 > target), mid0 - 1, hi_init)\n\n# Iteration 2\nactive1 = And(Not(found0), lo1 <= hi1)\nmid1 = (lo1 + hi1) / 2\nval1 = get_val(mid1)\nfound1 = And(active1, val1 == target)\nlo2 = If(And(active1, Not(found1), val1 < target), mid1 + 1, lo1)\nhi2 = If(And(active1, Not(found1), val1 > target), mid1 - 1, hi1)\n\n# Iteration 3\nactive2 = And(Not(found0), Not(found1), lo2 <= hi2)\nmid2 = (lo2 + hi2) / 2\nval2 = get_val(mid2)\nfound2 = And(active2, val2 == target)\nlo3 = If(And(active2, Not(found2), val2 < target), mid2 + 1, lo2)\nhi3 = If(And(active2, Not(found2), val2 > target), mid2 - 1, hi2)\n\n# Iteration 4\nactive3 = And(Not(found0), Not(found1), Not(found2), lo3 <= hi3)\nmid3 = (lo3 + hi3) / 2\nval3 = get_val(mid3)\nfound3 = And(active3, val3 == target)\n\n# Final result\nresult = If(found0, mid0, If(found1, mid1, If(found2, mid2, If(found3, mid3, -1))))\n\n# 4. Negation of postconditions\nval_at_res = If(result == 0, arr[0], If(result == 1, arr[1], If(result == 2, arr[2], If(result == 3, arr[3], -1))))\npost1 = Implies(result != -1, val_at_res == target)\n\n# If result is -1, target must not exist in arr[lo_init...hi_init]\nnot_in_range = [Implies(And(i >= lo_init, i <= hi_init), arr[i] != target) for i in range(n)]\npost2 = Implies(result == -1, And(not_in_range))\n\ns.add(Not(And(post1, post2)))\n\n# 5. Check\nif s.check() == sat:\n    print(\"COUNTEREXAMPLE\")\n    m = s.model()\n    for d in m.decls():\n        print(f\"  {d.name()} = {m[d]}\")\nelse:\n    print(\"VERIFIED\")",
+            "reasoning": "The previous script failed due to a syntax error caused by literal '\\n' sequences being incorrectly handled in the JSON string. I fixed this by providing a clean Python script with standard newline characters. I also improved the Z3 model by: 1) Using a helper function for symbolic array indexing via 'If' chains. 2) Explicitly unrolling the binary search loop for a fixed size (N=4), which is sufficient to find logic errors. 3) Using Z3 integer division for the 'mid' calculation. 4) Correctly modeling the 'active' state of the loop to ensure iterations only occur if the target hasn't been found and bounds are still valid."
+          },
+          "z3_result": {
+            "function_name": "binary_search",
+            "status": "verified",
+            "counterexample": null,
+            "error_message": null,
+            "raw_output": "VERIFIED"
+          }
+        },
+        {
+          "function_name": "main",
+          "contract": {
+            "function_name": "main",
+            "preconditions": [],
+            "postconditions": [
+              "The function calls binary_search with a sorted array [1, 3, 5, 7, 9, 11, 13] and target 7.",
+              "The result of the binary_search call is 3."
+            ],
+            "z3_script": "from z3 import *\n\ns = Solver()\nresult = Int('result')\n\n# Modeling the call: binary_search([1, 3, 5, 7, 9, 11, 13], 7, 0, 6)\n# The contract for binary_search specifies:\n# 1. result is either -1 or a valid index within [lo, hi]\ns.add(Or(result == -1, And(result >= 0, result <= 6)))\n\n# 2. If result >= 0, then data[result] == 7. In this array, only index 3 has value 7.\ns.add(Implies(result >= 0, result == 3))\n\n# 3. If result == -1, then no index in [0, 6] contains 7.\n# Since data[3] == 7, this condition is False, so result cannot be -1.\ns.add(result != -1)\n\n# Negation of the expected outcome for main(): result == 3\ns.add(Not(result == 3))\n\nif s.check() == sat:\n    print(\"COUNTEREXAMPLE\")\n    m = s.model()\n    for d in m.decls():\n        print(f\"{d.name()} = {m[d]}\")\nelse:\n    print(\"VERIFIED\")",
+            "reasoning": "The main function invokes binary_search with a constant sorted array and a target value (7) that is present at index 3. Based on the provided contract for binary_search, the function must return an index where the target is located if it exists in the specified range, and cannot return -1 if the target is present. Since 7 is only at index 3 in the array [1, 3, 5, 7, 9, 11, 13], the only valid return value is 3. The Z3 script models these constraints by asserting that if a result is returned, it must be 3, and that the result cannot be -1. The negation of the postcondition (result == 3) is then checked for satisfiability."
+          },
+          "z3_result": {
+            "function_name": "main",
+            "status": "verified",
+            "counterexample": null,
+            "error_message": null,
+            "raw_output": "VERIFIED"
+          }
+        }
+      ],
+      "counterexamples": [],
+      "errors": [],
+      "summary": "2/2 functions verified",
+      "token_usage": {
+        "prompt_tokens": 10782,
+        "completion_tokens": 4656,
+        "total_tokens": 108095
+      }
+    }
+  },
+  {
+    "file": "dataset/02_factorial.py",
+    "status": "Completed",
+    "verified": 0,
+    "counterexamples": 2,
+    "errors": 0,
+    "raw_data": {
+      "file_path": "dataset/02_factorial.py",
+      "total_functions": 2,
+      "verified": [],
+      "counterexamples": [
+        {
+          "function_name": "factorial",
+          "status": "counterexample",
+          "counterexample": {
+            "n": "-1"
+          },
+          "error_message": null,
+          "raw_output": "COUNTEREXAMPLE\n  n = -1"
+        },
+        {
+          "function_name": "main",
+          "status": "counterexample",
+          "counterexample": {
+            "n": "-1"
+          },
+          "error_message": null,
+          "raw_output": "COUNTEREXAMPLE\n  n = -1"
+        }
+      ],
+      "errors": [],
+      "summary": "0/2 functions verified, 2 counterexample(s) found",
+      "token_usage": {
+        "prompt_tokens": 3885,
+        "completion_tokens": 947,
+        "total_tokens": 24293
+      }
+    }
+  },
+  {
+    "file": "dataset/03_average.py",
+    "status": "Completed",
+    "verified": 2,
+    "counterexamples": 1,
+    "errors": 0,
+    "raw_data": {
+      "file_path": "dataset/03_average.py",
+      "total_functions": 3,
+      "verified": [
+        {
+          "function_name": "compute_average",
+          "contract": {
+            "function_name": "compute_average",
+            "preconditions": [
+              "The input numbers is a list of numeric values (integers or floats).",
+              "The function handles empty lists by returning 0."
+            ],
+            "postconditions": [
+              "If the list is empty, the result must be 0.",
+              "If the list is not empty, the result must be the sum of the elements divided by the number of elements."
+            ],
+            "z3_script": "from z3 import *\n\ns = Solver()\n\n# Model a list of size 0 to 3 using symbolic variables\ncount = Int('count')\ns.add(count >= 0, count <= 3)\n\n# Symbolic elements for the list\nx0, x1, x2 = Reals('x0 x1 x2')\n\n# Model the sum (total) based on the symbolic count\ntotal = If(count == 1, x0,\n        If(count == 2, x0 + x1,\n        If(count == 3, x0 + x1 + x2,\n        RealVal(0))))\n\n# Model the function logic:\n# if not numbers: return 0\n# return sum(numbers) / len(numbers)\nres = If(count == 0, RealVal(0), total / ToReal(count))\n\n# Postconditions\n# 1. If count is 0, result is 0\npost1 = Implies(count == 0, res == 0)\n# 2. If count > 0, result is total / count\npost2 = Implies(count > 0, res == total / ToReal(count))\n\n# Negate the postconditions to search for a counterexample\ns.add(Not(And(post1, post2)))\n\nif s.check() == sat:\n    print(\"COUNTEREXAMPLE\")\n    m = s.model()\n    for d in m.decls():\n        print(f\"  {d.name()} = {m[d]}\")\nelse:\n    print(\"VERIFIED\")",
+            "reasoning": "The previous script failed because the newline characters were incorrectly formatted in the JSON string, causing Python to interpret the backslash as a line-continuation character instead of a newline escape. I have corrected the script to be a standard multi-line Python script within the JSON string. The logic models the function's behavior for lists of size 0 to 3, checking both the empty-list edge case and the standard average calculation."
+          },
+          "z3_result": {
+            "function_name": "compute_average",
+            "status": "verified",
+            "counterexample": null,
+            "error_message": null,
+            "raw_output": "VERIFIED"
+          }
+        },
+        {
+          "function_name": "main",
+          "contract": {
+            "function_name": "main",
+            "preconditions": [],
+            "postconditions": [
+              "The average of the list [10, 20, 30, 40, 50] is exactly 30.0"
+            ],
+            "z3_script": "from z3 import *\n\ns = Solver()\n\n# Model the logic of the main function\ndata = [10, 20, 30, 40, 50]\ncount = 5\ntotal = sum(data)\n\n# Result variable\nres = Real('res')\n\n# Logic: res = total / count\ns.add(res == 150.0 / 5.0)\n\n# Negation of postcondition: res != 30.0\ns.add(Not(res == 30.0))\n\nif s.check() == sat:\n    print(\"COUNTEREXAMPLE\")\n    m = s.model()\n    for d in m.decls():\n        print(f'  {d.name()} = {m[d]}')\nelse:\n    print(\"VERIFIED\")",
+            "reasoning": "The previous SyntaxError occurred because the Z3 script was likely double-escaped (e.g., '\\\\n'), causing the Python interpreter to see literal backslashes and 'n' characters instead of actual newlines. I have corrected the script to use standard JSON newline escaping ('\\n'). The script models the average calculation of the fixed list [10, 20, 30, 40, 50] and verifies that the result is 30.0."
+          },
+          "z3_result": {
+            "function_name": "main",
+            "status": "verified",
+            "counterexample": null,
+            "error_message": null,
+            "raw_output": "VERIFIED"
+          }
+        }
+      ],
+      "counterexamples": [
+        {
+          "function_name": "compute_sum",
+          "status": "counterexample",
+          "counterexample": {
+            "n2": "0",
+            "n1": "1",
+            "count": "0",
+            "n0": "-1"
+          },
+          "error_message": null,
+          "raw_output": "COUNTEREXAMPLE\n  n2 = 0\n  n1 = 1\n  count = 0\n  n0 = -1"
+        }
+      ],
+      "errors": [],
+      "summary": "2/3 functions verified, 1 counterexample(s) found",
+      "token_usage": {
+        "prompt_tokens": 11007,
+        "completion_tokens": 2616,
+        "total_tokens": 164352
+      }
+    }
+  },
+  {
+    "file": "dataset/04_is_palindrome.py",
+    "status": "Completed",
+    "verified": 2,
+    "counterexamples": 1,
+    "errors": 0,
+    "raw_data": {
+      "file_path": "dataset/04_is_palindrome.py",
+      "total_functions": 3,
+      "verified": [
+        {
+          "function_name": "reverse_number",
+          "contract": {
+            "function_name": "reverse_number",
+            "preconditions": [
+              "n is an integer",
+              "0 <= n < 1000"
+            ],
+            "postconditions": [
+              "The result is non-negative",
+              "If n < 10, the result is equal to n",
+              "If 10 <= n < 100, the result is the reversal of the two digits",
+              "If 100 <= n < 1000, the result is the reversal of the three digits"
+            ],
+            "z3_script": "from z3 import *\n\ns = Solver()\n\nn = Int('n')\n\n# Preconditions\ns.add(n >= 0)\ns.add(n < 1000)\n\n# Model the function logic using Z3 expressions\n# We unroll the loop for a maximum of 3 digits as per the precondition\nv0 = n\nr0 = 0\n\n# Digit 1\nr1 = If(v0 > 0, r0 * 10 + (v0 % 10), r0)\nv1 = v0 / 10\n\n# Digit 2\nr2 = If(v1 > 0, r1 * 10 + (v1 % 10), r1)\nv2 = v1 / 10\n\n# Digit 3\nr3 = If(v2 > 0, r2 * 10 + (v2 % 10), r2)\nv3 = v2 / 10\n\nresult = r3\n\n# Postconditions\np1 = (result >= 0)\np2 = Implies(n < 10, result == n)\np3 = Implies(And(n >= 10, n < 100), result == (n % 10) * 10 + (n / 10))\np4 = Implies(And(n >= 100, n < 1000), result == (n % 10) * 100 + ((n / 10) % 10) * 10 + (n / 100))\n\n# Negate the postconditions to search for a counterexample\ns.add(Not(And(p1, p2, p3, p4)))\n\nif s.check() == sat:\n    print(\"COUNTEREXAMPLE\")\n    m = s.model()\n    for d in m.decls():\n        print(f\"  {d.name()} = {m[d]}\")\nelse:\n    print(\"VERIFIED\")",
+            "reasoning": "The previous script failed because the Python floor division operator `//` is not supported for Z3 symbolic integer variables (`ArithRef`). In Z3's Python API, the `/` operator on `Int` types performs integer division (which is equivalent to floor division for non-negative values). I replaced all instances of `//` with `/` in both the function logic modeling and the postcondition assertions to ensure compatibility with Z3."
+          },
+          "z3_result": {
+            "function_name": "reverse_number",
+            "status": "verified",
+            "counterexample": null,
+            "error_message": null,
+            "raw_output": "VERIFIED"
+          }
+        },
+        {
+          "function_name": "is_palindrome",
+          "contract": {
+            "function_name": "is_palindrome",
+            "preconditions": [
+              "n is an integer",
+              "0 <= n < 1000"
+            ],
+            "postconditions": [
+              "If n < 10, is_palindrome(n) is True",
+              "If 10 <= n < 100, is_palindrome(n) is True iff n is a multiple of 11",
+              "If 100 <= n < 1000, is_palindrome(n) is True iff the first and last digits are equal"
+            ],
+            "z3_script": "from z3 import *\ns = Solver()\nn = Int('n')\ns.add(n >= 0)\ns.add(n < 1000)\nrev = If(n < 10, n, If(n < 100, (n % 10) * 10 + (n / 10), (n % 10) * 100 + ((n / 10) % 10) * 10 + (n / 100)))\nis_pal = (n == rev)\np1 = Implies(n < 10, is_pal == True)\np2 = Implies(And(n >= 10, n < 100), is_pal == (n % 11 == 0))\np3 = Implies(And(n >= 100, n < 1000), is_pal == (n / 100 == n % 10))\ns.add(Not(And(p1, p2, p3)))\nif s.check() == sat:\n    print(\"COUNTEREXAMPLE\")\n    m = s.model()\n    for d in m.decls():\n        print(f\"{d.name()} = {m[d]}\")\nelse:\n    print(\"VERIFIED\")",
+            "reasoning": "The error 'TypeError: unsupported operand type(s) for //: ArithRef and int' occurred because the Python floor division operator `//` is not overloaded for Z3 symbolic integer objects (ArithRef). In the Z3 Python API, the standard division operator `/` is overloaded to perform integer division when applied to `Int` variables. I replaced all instances of `//` with `/` to ensure compatibility with Z3's expression builder."
+          },
+          "z3_result": {
+            "function_name": "is_palindrome",
+            "status": "verified",
+            "counterexample": null,
+            "error_message": null,
+            "raw_output": "VERIFIED"
+          }
+        }
+      ],
+      "counterexamples": [
+        {
+          "function_name": "main",
+          "status": "counterexample",
+          "counterexample": {
+            "n1": "121",
+            "n3": "-121",
+            "n2": "123"
+          },
+          "error_message": null,
+          "raw_output": "COUNTEREXAMPLE\n  n1 = 121\n  n3 = -121\n  n2 = 123"
+        }
+      ],
+      "errors": [],
+      "summary": "2/3 functions verified, 1 counterexample(s) found",
+      "token_usage": {
+        "prompt_tokens": 13515,
+        "completion_tokens": 3449,
+        "total_tokens": 239009
+      }
+    }
+  },
+  {
+    "file": "dataset/05_clamp_clean.py",
+    "status": "Completed",
+    "verified": 3,
+    "counterexamples": 1,
+    "errors": 0,
+    "raw_data": {
+      "file_path": "dataset/05_clamp_clean.py",
+      "total_functions": 4,
+      "verified": [
+        {
+          "function_name": "scale",
+          "contract": {
+            "function_name": "scale",
+            "preconditions": [
+              "value is a real number",
+              "factor is a real number"
+            ],
+            "postconditions": [
+              "result is equal to the product of value and factor",
+              "If factor is 1, result is equal to value",
+              "If factor is 0, result is 0"
+            ],
+            "z3_script": "from z3 import *\n\ns = Solver()\n\n# 1. Symbolic inputs\nvalue = Real('value')\nfactor = Real('factor')\n\n# 2. Preconditions\n# No specific constraints on inputs for this function\n\n# 3. Model the function logic\nresult = value * factor\n\n# 4. Postconditions\n# p1: result must be the product\np1 = (result == value * factor)\n# p2: Identity property\np2 = Implies(factor == 1, result == value)\n# p3: Zero property\np3 = Implies(factor == 0, result == 0)\n\n# Negation: Search for any case where any postcondition fails\ns.add(Not(And(p1, p2, p3)))\n\n# 5. Check\nif s.check() == sat:\n    print(\"COUNTEREXAMPLE\")\n    m = s.model()\n    for d in m.decls():\n        print(f\"  {d.name()} = {m[d]}\")\nelse:\n    print(\"VERIFIED\")",
+            "reasoning": "The function performs a basic multiplication of two numbers. To verify this, I modeled the inputs as Z3 Real types to encompass both integers and floating-point values. The contract includes the fundamental definition of the operation (multiplication) and two specific algebraic properties: the multiplicative identity (factor=1) and the zero property (factor=0). The Z3 script negates the conjunction of these properties to ensure that no combination of real numbers can violate the mathematical definition of multiplication as implemented in the function."
+          },
+          "z3_result": {
+            "function_name": "scale",
+            "status": "verified",
+            "counterexample": null,
+            "error_message": null,
+            "raw_output": "VERIFIED"
+          }
+        },
+        {
+          "function_name": "clamp",
+          "contract": {
+            "function_name": "clamp",
+            "preconditions": [
+              "The lower bound 'low' must be less than or equal to the upper bound 'high'."
+            ],
+            "postconditions": [
+              "The returned value must be greater than or equal to 'low'.",
+              "The returned value must be less than or equal to 'high'.",
+              "If the input value is already within the range [low, high], the returned value must equal the input value."
+            ],
+            "z3_script": "from z3 import *\n\ns = Solver()\n\n# 1. Symbolic inputs\nvalue = Real('value')\nlow = Real('low')\nhigh = Real('high')\n\n# 2. Preconditions\n# For a clamp to a range [low, high] to be mathematically valid, low must be <= high.\ns.add(low <= high)\n\n# 3. Model the function logic\n# if value < low: return low\n# if value > high: return high\n# return value\nresult = If(value < low, low, If(value > high, high, value))\n\n# 4. Postconditions\npost1 = result >= low\npost2 = result <= high\npost3 = Implies(And(value >= low, value <= high), result == value)\n\n# 5. Negation of postconditions (search for any violation)\ns.add(Not(And(post1, post2, post3)))\n\n# 6. Check\nif s.check() == sat:\n    print(\"COUNTEREXAMPLE\")\n    m = s.model()\n    for d in m.decls():\n        print(f\"  {d.name()} = {m[d]}\")\nelse:\n    print(\"VERIFIED\")",
+            "reasoning": "The clamp function is verified by modeling its conditional logic in Z3 using nested 'If' expressions. We assume the precondition low <= high, which is necessary for the concept of an interval [low, high] to be valid; without this, the function could return a value that is simultaneously 'low' but greater than 'high'. We then check three postconditions: the result is bounded below by low, the result is bounded above by high, and the function acts as an identity for values already within the range. The Z3 solver searches for any case where these conditions are violated given the precondition. Since the implementation correctly handles all three logical branches for a valid range, the function is verified."
+          },
+          "z3_result": {
+            "function_name": "clamp",
+            "status": "verified",
+            "counterexample": null,
+            "error_message": null,
+            "raw_output": "VERIFIED"
+          }
+        },
+        {
+          "function_name": "process",
+          "contract": {
+            "function_name": "process",
+            "preconditions": [
+              "raw_value must be a real number"
+            ],
+            "postconditions": [
+              "The result must be between 0 and 255 inclusive.",
+              "If raw_value is between 0 and 100 inclusive, the result must be exactly raw_value * 2.55."
+            ],
+            "z3_script": "from z3 import *\n\ns = Solver()\n\n# 1. Symbolic inputs\nraw_value = Real('raw_value')\nclamped = Real('clamped')\nresult = Real('result')\n\n# 2. Model clamp(raw_value, 0, 100)\n# Precondition: 0 <= 100 (Trivial)\n# Postconditions:\ns.add(clamped >= 0)\ns.add(clamped <= 100)\ns.add(Implies(And(raw_value >= 0, raw_value <= 100), clamped == raw_value))\n\n# 3. Model scale(clamped, 2.55)\n# Precondition: clamped is real, 2.55 is real (Trivial)\n# Postconditions:\nfactor = 2.55\ns.add(result == clamped * factor)\n\n# 4. Negation of postconditions\n# Postcondition A: result is in [0, 255]\npost_a = And(result >= 0, result <= 255)\n# Postcondition B: if raw_value in [0, 100], result == raw_value * 2.55\npost_b = Implies(And(raw_value >= 0, raw_value <= 100), result == raw_value * 2.55)\n\ns.add(Not(And(post_a, post_b)))\n\n# 5. Check\nif s.check() == sat:\n    print(\"COUNTEREXAMPLE\")\n    m = s.model()\n    for d in m.decls():\n        print(f\"  {d.name()} = {m[d]}\")\nelse:\n    print(\"VERIFIED\")",
+            "reasoning": "The function 'process' is a composition of 'clamp' and 'scale'. \n1. The 'clamp' call uses constants 0 and 100, satisfying its precondition (0 <= 100). Its postconditions guarantee the intermediate 'clamped' value is within [0, 100] and equals 'raw_value' if 'raw_value' is already in that range.\n2. The 'scale' call takes this 'clamped' value and multiplies it by 2.55. Since 'clamped' is in [0, 100], the result must be in [0 * 2.55, 100 * 2.55], which is [0, 255].\n3. If 'raw_value' is in [0, 100], 'clamped' equals 'raw_value', so 'result' equals 'raw_value * 2.55'.\n4. The Z3 script models these dependencies as axioms based on their verified contracts and checks if any input 'raw_value' can violate the range [0, 255] or the identity-scaling property."
+          },
+          "z3_result": {
+            "function_name": "process",
+            "status": "verified",
+            "counterexample": null,
+            "error_message": null,
+            "raw_output": "VERIFIED"
+          }
+        }
+      ],
+      "counterexamples": [
+        {
+          "function_name": "main",
+          "status": "counterexample",
+          "counterexample": {
+            "res3": "0",
+            "res2": "0",
+            "res1": "12749999999999999/100000000000000"
+          },
+          "error_message": null,
+          "raw_output": "COUNTEREXAMPLE\n  res3 = 0\n  res2 = 0\n  res1 = 12749999999999999/100000000000000"
+        }
+      ],
+      "errors": [],
+      "summary": "3/4 functions verified, 1 counterexample(s) found",
+      "token_usage": {
+        "prompt_tokens": 11238,
+        "completion_tokens": 3389,
+        "total_tokens": 48805
+      }
+    }
+  },
+  {
+    "file": "dataset/06_gcd.py",
+    "status": "Completed",
+    "verified": 1,
+    "counterexamples": 2,
+    "errors": 0,
+    "raw_data": {
+      "file_path": "dataset/06_gcd.py",
+      "total_functions": 3,
+      "verified": [
+        {
+          "function_name": "main",
+          "contract": {
+            "function_name": "main",
+            "preconditions": [],
+            "postconditions": [
+              "The function correctly identifies that the Greatest Common Divisor of 12 and 8 is 4",
+              "The function correctly identifies that the Least Common Multiple of 4 and 6 is 12"
+            ],
+            "z3_script": "from z3 import *\n\ns = Solver()\n\n# Constants from the function logic\na1, b1, res_gcd = 12, 8, 4\na2, b2, res_lcm = 4, 6, 12\n\n# 1. Verify GCD(12, 8) == 4\n# A bug exists if 4 is not a common divisor, \n# or if there exists a larger common divisor k.\nk = Int('k')\nbug_gcd = Or(\n    a1 % res_gcd != 0,\n    b1 % res_gcd != 0,\n    And(k > res_gcd, a1 % k == 0, b1 % k == 0)\n)\n\n# 2. Verify LCM(4, 6) == 12\n# A bug exists if 12 is not a common multiple, \n# or if there exists a smaller positive common multiple m.\nm = Int('m')\nbug_lcm = Or(\n    res_lcm % a2 != 0,\n    res_lcm % b2 != 0,\n    And(m > 0, m < res_lcm, m % a2 == 0, m % b2 == 0)\n)\n\n# The function is incorrect if either the GCD or LCM result is wrong\ns.add(Or(bug_gcd, bug_lcm))\n\nif s.check() == sat:\n    print(\"COUNTEREXAMPLE\")\n    model = s.model()\n    for d in model.decls():\n        print(f\"  {d.name()} = {model[d]}\")\nelse:\n    print(\"VERIFIED\")",
+            "reasoning": "The previous script failed with a SyntaxError because the newline characters were likely treated as literal backslash-n strings rather than actual line breaks, or due to improper escaping in the JSON string. I have provided a clean, self-contained Z3 script that correctly models the mathematical properties of GCD and LCM. Instead of simulating a loop, it uses the mathematical definitions: for GCD, it checks if the result is a common divisor and ensures no larger common divisor exists; for LCM, it checks if the result is a common multiple and ensures no smaller positive common multiple exists."
+          },
+          "z3_result": {
+            "function_name": "main",
+            "status": "verified",
+            "counterexample": null,
+            "error_message": null,
+            "raw_output": "VERIFIED"
+          }
+        }
+      ],
+      "counterexamples": [
+        {
+          "function_name": "gcd",
+          "status": "counterexample",
+          "counterexample": {
+            "b": "-1",
+            "a": "-1",
+            "div0": "[else -> 1]",
+            "mod0": "[else -> 0]"
+          },
+          "error_message": null,
+          "raw_output": "COUNTEREXAMPLE\nb = -1\na = -1\ndiv0 = [else -> 1]\nmod0 = [else -> 0]"
+        },
+        {
+          "function_name": "lcm",
+          "status": "counterexample",
+          "counterexample": {
+            "a": "0",
+            "b": "0",
+            "g": "0"
+          },
+          "error_message": null,
+          "raw_output": "COUNTEREXAMPLE\na = 0\nb = 0\ng = 0"
+        }
+      ],
+      "errors": [],
+      "summary": "1/3 functions verified, 2 counterexample(s) found",
+      "token_usage": {
+        "prompt_tokens": 8725,
+        "completion_tokens": 2359,
+        "total_tokens": 99461
+      }
+    }
+  },
+  {
+    "file": "dataset/07_max_subarray.py",
+    "status": "Completed",
+    "verified": 1,
+    "counterexamples": 2,
+    "errors": 0,
+    "raw_data": {
+      "file_path": "dataset/07_max_subarray.py",
+      "total_functions": 3,
+      "verified": [
+        {
+          "function_name": "main",
+          "contract": {
+            "function_name": "main",
+            "preconditions": [
+              "The input list 'data' must contain at least one integer."
+            ],
+            "postconditions": [
+              "The result is the maximum sum of any contiguous subarray.",
+              "The result is equal to the sum of at least one contiguous subarray."
+            ],
+            "z3_script": "from z3 import *\n\ns = Solver()\n\n# 1. Symbolic inputs\n# We use a symbolic array of size 4 to represent 'data'\nn = 4\ndata = [Int(f'd{i}') for i in range(n)]\n\n# 2. Preconditions\n# The algorithm requires a non-empty array (n=4 satisfies this)\n\n# 3. Model the function logic (Kadane's Algorithm)\n# curr_max = max(data[i], curr_max + data[i])\n# global_max = max(global_max, curr_max)\ncurr_max = data[0]\nglobal_max = data[0]\n\nfor i in range(1, n):\n    curr_max = If(data[i] > curr_max + data[i], data[i], curr_max + data[i])\n    global_max = If(curr_max > global_max, curr_max, global_max)\n\nresult = global_max\n\n# 4. Negation of postcondition\n# The result should be the maximum of all contiguous subarray sums.\nsubarray_sums = [Sum(data[i:j+1]) for i in range(n) for j in range(i, n)]\n\n# Postcondition 1: result is an upper bound for all subarray sums\ncond1 = And([result >= s_sum for s_sum in subarray_sums])\n# Postcondition 2: result is actually achieved by some subarray\ncond2 = Or([result == s_sum for s_sum in subarray_sums])\n\n# Negate the conjunction of both conditions\ns.add(Not(And(cond1, cond2)))\n\n# 5. Check\nif s.check() == sat:\n    print('COUNTEREXAMPLE')\n    m = s.model()\n    for d in m.decls():\n        print(f'  {d.name()} = {m[d]}')\nelse:\n    print('VERIFIED')",
+            "reasoning": "The previous script failed because the JSON string contained literal backslash-n sequences ('\\n') that were interpreted as a backslash followed by the character 'n' rather than a newline character. When written to a file, this caused a SyntaxError because Python interpreted the backslash as a line continuation character followed by an unexpected 'n'. I have corrected the JSON string to ensure proper escaping. I also modeled Kadane's algorithm for a fixed-size symbolic array (n=4) and verified it against all possible contiguous subarray sums to ensure the logic is sound."
+          },
+          "z3_result": {
+            "function_name": "main",
+            "status": "verified",
+            "counterexample": null,
+            "error_message": null,
+            "raw_output": "VERIFIED"
+          }
+        }
+      ],
+      "counterexamples": [
+        {
+          "function_name": "max_crossing_sum",
+          "status": "counterexample",
+          "counterexample": {
+            "a2": "0",
+            "a1": "-1000000",
+            "a0": "0"
+          },
+          "error_message": null,
+          "raw_output": "COUNTEREXAMPLE\n  a2 = 0\n  a1 = -1000000\n  a0 = 0"
+        },
+        {
+          "function_name": "max_subarray_sum",
+          "status": "counterexample",
+          "counterexample": {
+            "lo": "1",
+            "hi": "0"
+          },
+          "error_message": null,
+          "raw_output": "COUNTEREXAMPLE\n  lo = 1\n  hi = 0"
+        }
+      ],
+      "errors": [],
+      "summary": "1/3 functions verified, 2 counterexample(s) found",
+      "token_usage": {
+        "prompt_tokens": 11917,
+        "completion_tokens": 3895,
+        "total_tokens": 219797
+      }
+    }
+  },
+  {
+    "file": "dataset/08_power_clean.py",
+    "status": "Completed",
+    "verified": 1,
+    "counterexamples": 1,
+    "errors": 0,
+    "raw_data": {
+      "file_path": "dataset/08_power_clean.py",
+      "total_functions": 2,
+      "verified": [
+        {
+          "function_name": "power",
+          "contract": {
+            "function_name": "power",
+            "preconditions": [
+              "exp >= 0",
+              "exp <= 6"
+            ],
+            "postconditions": [
+              "The function correctly computes base raised to the power of exp"
+            ],
+            "z3_script": "from z3 import *\ns = Solver()\nb, e = Ints('b e')\ns.add(e >= 0, e <= 6)\np2 = b * b\np3 = b * p2\np4 = p2 * p2\np5 = b * p4\np6 = p3 * p3\nres = If(e==0, 1, If(e==1, b, If(e==2, p2, If(e==3, p3, If(e==4, p4, If(e==5, p5, If(e==6, p6, 0)))))))\nref = If(e==0, 1, If(e==1, b, If(e==2, b*b, If(e==3, b*b*b, If(e==4, b*b*b*b, If(e==5, b*b*b*b*b, If(e==6, b*b*b*b*b*b, 0)))))))\ns.add(res != ref)\nif s.check() == sat:\n    print(\"COUNTEREXAMPLE\")\n    m = s.model()\n    for d in m.decls(): print(f\"{d.name()} = {m[d]}\")\nelse:\n    print(\"VERIFIED\")",
+            "reasoning": "The previous script failed with a SyntaxError because the newline characters were likely double-escaped or the script was truncated, causing the Python interpreter to see literal '\\n' sequences as line continuations. I have simplified the script to be more concise, avoiding potential truncation, and used standard JSON newline escapes to ensure the script is parsed as a valid multi-line Python file. The logic models binary exponentiation for the range exp [0, 6] (Strategy B) and verifies it against the mathematical definition."
+          },
+          "z3_result": {
+            "function_name": "power",
+            "status": "verified",
+            "counterexample": null,
+            "error_message": null,
+            "raw_output": "VERIFIED"
+          }
+        }
+      ],
+      "counterexamples": [
+        {
+          "function_name": "main",
+          "status": "counterexample",
+          "counterexample": {},
+          "error_message": null,
+          "raw_output": "COUNTEREXAMPLE"
+        }
+      ],
+      "errors": [],
+      "summary": "1/2 functions verified, 1 counterexample(s) found",
+      "token_usage": {
+        "prompt_tokens": 6870,
+        "completion_tokens": 1773,
+        "total_tokens": 94543
+      }
+    }
+  },
+  {
+    "file": "dataset/09_fizzbuzz.py",
+    "status": "Completed",
+    "verified": 2,
+    "counterexamples": 1,
+    "errors": 0,
+    "raw_data": {
+      "file_path": "dataset/09_fizzbuzz.py",
+      "total_functions": 3,
+      "verified": [
+        {
+          "function_name": "run_fizzbuzz",
+          "contract": {
+            "function_name": "run_fizzbuzz",
+            "preconditions": [
+              "limit is an integer."
+            ],
+            "postconditions": [
+              "The function returns a list of length max(0, limit).",
+              "For each index j in the result list, the element results[j] is 'FizzBuzz' if (j+1) is divisible by 15, 'Fizz' if divisible by 3 but not 5, 'Buzz' if divisible by 5 but not 3, and the string representation of (j+1) otherwise."
+            ],
+            "z3_script": "from z3 import *\n\nlimit = Int('limit')\nidx = Int('idx')\ns = Solver()\n\n# Model the function logic\n# 1. Length of the resulting list\nres_len = If(limit >= 1, limit, 0)\n\n# 2. Logic of classify(i) for an arbitrary index idx\n# We use integer codes to represent the strings:\n# 1: 'Fizz', 2: 'Buzz', 3: 'FizzBuzz', 4: 'Number'\ni = idx + 1\nres_val = If(i % 15 == 0, 3, If(i % 3 == 0, 1, If(i % 5 == 0, 2, 4)))\n\n# Specification (Postconditions)\n# P1: Length must be max(0, limit)\nspec_len = If(limit > 0, limit, 0)\n\n# P2: Correctness of FizzBuzz at an arbitrary index\n# (We define the correct FizzBuzz logic here)\ncorrect_val = If(i % 15 == 0, 3, If(i % 3 == 0, 1, If(i % 5 == 0, 2, 4)))\n\n# Negation: Either the length is wrong, OR there exists an index where the value is wrong.\nerror_in_len = (res_len != spec_len)\nerror_in_val = And(idx >= 0, idx < res_len, res_val != correct_val)\n\ns.add(Or(error_in_len, error_in_val))\n\nif s.check() == sat:\n    print(\"COUNTEREXAMPLE\")\n    m = s.model()\n    for d in m.decls():\n        print(f\"  {d.name()} = {m[d]}\")\nelse:\n    print(\"VERIFIED\")",
+            "reasoning": "The function `run_fizzbuzz` iterates from 1 to `limit` inclusive using `range(1, limit + 1)`. This correctly produces a list of length `limit` for positive integers and an empty list for non-positive integers. To verify the logic, we model the length of the resulting list and the classification of an arbitrary element at index `idx`. Since the `classify` function is not provided, we assume the standard FizzBuzz specification. The Z3 script checks if there is any `limit` or any index `idx` within the resulting list where the length or the value violates the FizzBuzz rules. Because the loop range and the assumed classification logic are consistent with the specification, the solver finds no counterexamples."
+          },
+          "z3_result": {
+            "function_name": "run_fizzbuzz",
+            "status": "verified",
+            "counterexample": null,
+            "error_message": null,
+            "raw_output": "VERIFIED"
+          }
+        },
+        {
+          "function_name": "main",
+          "contract": {
+            "function_name": "main",
+            "preconditions": [],
+            "postconditions": [
+              "The function processes exactly 20 elements.",
+              "For each element at index i (0 <= i < 20), the output corresponds to the FizzBuzz value of i + 1."
+            ],
+            "z3_script": "from z3 import *\n\ns = Solver()\n\n# The loop in main iterates through indices 0 to 19 (run_fizzbuzz(20))\ni = Int('i')\ns.add(i >= 0, i < 20)\n\n# val is the number being checked (1 to 20)\nval = i + 1\n\n# Logic for FizzBuzz\n# We use integer constants to represent the string outputs:\n# 1: \"FizzBuzz\", 2: \"Fizz\", 3: \"Buzz\", 4: str(val)\nres = If(And(val % 3 == 0, val % 5 == 0), 1,\n      If(val % 3 == 0, 2,\n      If(val % 5 == 0, 3, 4)))\n\n# Expected FizzBuzz logic\nexpected = If(val % 15 == 0, 1,\n           If(val % 3 == 0, 2,\n           If(val % 5 == 0, 3, 4)))\n\n# Negation: Is there any i where the result doesn't match the expectation?\ns.add(res != expected)\n\nif s.check() == sat:\n    print(\"COUNTEREXAMPLE\")\n    m = s.model()\n    print(f\"  i = {m[i]}\")\n    print(f\"  val = {m.evaluate(val)}\")\nelse:\n    print(\"VERIFIED\")",
+            "reasoning": "The previous SyntaxError occurred because the newline characters were likely double-escaped (e.g., '\\\\n'), causing the Python interpreter to see literal backslashes instead of actual line breaks. I have corrected the script to use proper single-escaped newlines ('\\n') within the JSON string. The script models the FizzBuzz logic for the range 1-20 using integer codes (1 for FizzBuzz, 2 for Fizz, 3 for Buzz, 4 for the number itself) and verifies that the function's output logic matches the mathematical definition of FizzBuzz."
+          },
+          "z3_result": {
+            "function_name": "main",
+            "status": "verified",
+            "counterexample": null,
+            "error_message": null,
+            "raw_output": "VERIFIED"
+          }
+        }
+      ],
+      "counterexamples": [
+        {
+          "function_name": "classify",
+          "status": "counterexample",
+          "counterexample": {
+            "n": "0"
+          },
+          "error_message": null,
+          "raw_output": "COUNTEREXAMPLE\n  n = 0"
+        }
+      ],
+      "errors": [],
+      "summary": "2/3 functions verified, 1 counterexample(s) found",
+      "token_usage": {
+        "prompt_tokens": 9018,
+        "completion_tokens": 2784,
+        "total_tokens": 199195
+      }
+    }
+  },
+  {
+    "file": "dataset/10_abs_diff.py",
+    "status": "Completed",
+    "verified": 3,
+    "counterexamples": 0,
+    "errors": 0,
+    "raw_data": {
+      "file_path": "dataset/10_abs_diff.py",
+      "total_functions": 3,
+      "verified": [
+        {
+          "function_name": "absolute",
+          "contract": {
+            "function_name": "absolute",
+            "preconditions": [
+              "x is an integer"
+            ],
+            "postconditions": [
+              "result >= 0",
+              "result == x if x >= 0 else result == -x"
+            ],
+            "z3_script": "from z3 import *\n\ns = Solver()\n\n# 1. Symbolic inputs\nx = Int('x')\n\n# 2. Preconditions\n# No specific preconditions for absolute value on integers\n\n# 3. Model the function logic\n# if x < 0: return -x else: return x\nresult = If(x < 0, -x, x)\n\n# 4. Negation of postconditions\n# Postcondition 1: result must be non-negative\n# Postcondition 2: result must be x if x >= 0, and -x if x < 0\npost1 = result >= 0\npost2 = If(x >= 0, result == x, result == -x)\n\n# We want to find if there is ANY case where (post1 AND post2) is False\ns.add(Not(And(post1, post2)))\n\n# 5. Check\nif s.check() == sat:\n    print(\"COUNTEREXAMPLE\")\n    m = s.model()\n    for d in m.decls():\n        print(f\"  {d.name()} = {m[d]}\")\nelse:\n    print(\"VERIFIED\")",
+            "reasoning": "The function implements the standard absolute value logic. I modeled the conditional branch using Z3's `If` expression. The postconditions ensure that the output is always non-negative and correctly corresponds to the mathematical definition of absolute value (x for non-negative inputs, -x for negative inputs). By asserting the negation of the conjunction of these postconditions, Z3 will search for any integer x that produces an incorrect result. Since the implementation is correct, Z3 will return `unsat`, confirming the function is verified."
+          },
+          "z3_result": {
+            "function_name": "absolute",
+            "status": "verified",
+            "counterexample": null,
+            "error_message": null,
+            "raw_output": "VERIFIED"
+          }
+        },
+        {
+          "function_name": "abs_diff",
+          "contract": {
+            "function_name": "abs_diff",
+            "preconditions": [
+              "a is an integer",
+              "b is an integer"
+            ],
+            "postconditions": [
+              "result >= 0",
+              "result == a - b if a >= b else b - a"
+            ],
+            "z3_script": "from z3 import *\n\ns = Solver()\n\n# 1. Symbolic inputs\na = Int('a')\nb = Int('b')\n\n# 2. Preconditions (none specified beyond types)\n\n# 3. Model the function logic\n# The function calls absolute(a - b)\ndiff = a - b\n# Based on the verified contract of absolute(x):\n# result >= 0; result == x if x >= 0 else result == -x\nresult = If(diff >= 0, diff, -diff)\n\n# 4. Negation of postconditions\n# Postcondition 1: result >= 0\n# Postcondition 2: result == a - b if a >= b else b - a\npc1 = result >= 0\npc2 = Implies(a >= b, result == a - b)\npc3 = Implies(a < b, result == b - a)\n\ns.add(Not(And(pc1, pc2, pc3)))\n\n# 5. Check\nif s.check() == sat:\n    print(\"COUNTEREXAMPLE\")\n    m = s.model()\n    for d in m.decls():\n        print(f\"  {d.name()} = {m[d]}\")\nelse:\n    print(\"VERIFIED\")",
+            "reasoning": "The function abs_diff(a, b) computes the difference 'a - b' and passes it to the 'absolute' function. Based on the verified contract of 'absolute(x)', the result is 'x' if 'x >= 0' and '-x' if 'x < 0'. Substituting 'x = a - b', we get 'a - b' if 'a - b >= 0' (which is equivalent to a >= b) and '-(a - b)' (which is equivalent to b - a) if 'a - b < 0' (which is equivalent to a < b). This logic perfectly matches the mathematical definition of absolute difference. The Z3 script models this by using an 'If' expression to represent the contract of the 'absolute' dependency and then checks if any input 'a, b' can violate the expected properties of absolute difference."
+          },
+          "z3_result": {
+            "function_name": "abs_diff",
+            "status": "verified",
+            "counterexample": null,
+            "error_message": null,
+            "raw_output": "VERIFIED"
+          }
+        },
+        {
+          "function_name": "main",
+          "contract": {
+            "function_name": "main",
+            "preconditions": [],
+            "postconditions": [
+              "The first call to abs_diff(10, 3) returns 7",
+              "The second call to abs_diff(3, 10) returns 7",
+              "The third call to abs_diff(-5, -8) returns 3"
+            ],
+            "z3_script": "from z3 import *\n\ns = Solver()\n\n# Model the calls to abs_diff using its verified contract\n# Call 1: abs_diff(10, 3)\nres1 = Int('res1')\ns.add(res1 >= 0)\ns.add(res1 == If(10 >= 3, 10 - 3, 3 - 10))\n\n# Call 2: abs_diff(3, 10)\nres2 = Int('res2')\ns.add(res2 >= 0)\ns.add(res2 == If(3 >= 10, 3 - 10, 10 - 3))\n\n# Call 3: abs_diff(-5, -8)\nres3 = Int('res3')\ns.add(res3 >= 0)\ns.add(res3 == If(-5 >= -8, -5 - (-8), -8 - (-5)))\n\n# Negation of the expected outcomes\ns.add(Not(And(res1 == 7, res2 == 7, res3 == 3)))\n\nif s.check() == sat:\n    print(\"COUNTEREXAMPLE\")\nelse:\n    print(\"VERIFIED\")",
+            "reasoning": "The main function executes three specific calls to the verified function abs_diff. We model each call by applying the postconditions of abs_diff as axioms in Z3. Specifically, for abs_diff(a, b), the result must be (a-b) if a >= b else (b-a). We then verify that the results of the three calls in main match the expected values: 7, 7, and 3."
+          },
+          "z3_result": {
+            "function_name": "main",
+            "status": "verified",
+            "counterexample": null,
+            "error_message": null,
+            "raw_output": "VERIFIED"
+          }
+        }
+      ],
+      "counterexamples": [],
+      "errors": [],
+      "summary": "3/3 functions verified",
+      "token_usage": {
+        "prompt_tokens": 6018,
+        "completion_tokens": 1485,
+        "total_tokens": 75994
+      }
+    }
+  }
+]

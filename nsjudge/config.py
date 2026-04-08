@@ -8,3 +8,4 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3-flash-preview"
     sandbox_timeout_seconds: int = 60
     max_refinement_attempts: int = 3
+    thinking_budget: int = 0  # 0 = fast-first with thinking escalation on error; -1 = always full thinking
